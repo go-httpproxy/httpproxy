@@ -51,3 +51,21 @@ func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
 func ServeInMemory(w http.ResponseWriter, code int, header http.Header, body []byte) error {
 	return ServeResponse(w, InMemoryResponse(code, header, body))
 }
+
+func removeProxyHeaders(r *http.Request) {
+	// If no Accept-Encoding header exists, Transport will add the headers it can accept
+	// and would wrap the response body with the relevant reader.
+	r.Header.Del("Accept-Encoding")
+	// curl can add that, see
+	// https://jdebp.eu./FGA/web-proxy-connection-header.html
+	r.Header.Del("Proxy-Connection")
+	r.Header.Del("Proxy-Authenticate")
+	r.Header.Del("Proxy-Authorization")
+	// Connection, Authenticate and Authorization are single hop Header:
+	// http://www.w3.org/Protocols/rfc2616/rfc2616.txt
+	// 14.10 Connection
+	//   The Connection general-header field allows the sender to specify
+	//   options that are desired for that particular connection and MUST NOT
+	//   be communicated by proxies over further connections.
+	r.Header.Del("Connection")
+}

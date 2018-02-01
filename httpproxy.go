@@ -24,8 +24,8 @@ type Proxy struct {
 	OnAccept   func(ctx *Context, req *http.Request) *http.Response
 	OnAuth     func(ctx *Context, user string, pass string) bool
 	OnConnect  func(ctx *Context, host string) (ConnectAction, string)
-	OnRequest  func(ctx *Context, req *http.Request) (*http.Request, *http.Response)
-	OnResponse func(ctx *Context, resp *http.Response) *http.Response
+	OnRequest  func(ctx *Context, req *http.Request) *http.Response
+	OnResponse func(ctx *Context, req *http.Request, resp *http.Response)
 }
 
 func doError(ctx *Context, error error) {
@@ -80,6 +80,54 @@ func doAuth(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
+func doRequest(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
+	r.RequestURI = ""
+	if !r.URL.IsAbs() {
+		if r.Close {
+			defer r.Body.Close()
+		}
+		err := ServeInMemory(w, 500, nil, []byte("This is a proxy server. Does not respond to non-proxy requests."))
+		if err != nil {
+			doError(ctx, err)
+		}
+		return true
+	}
+	if ctx.Prx.OnRequest == nil {
+		return false
+	}
+	resp := ctx.Prx.OnRequest(ctx, r)
+	if resp == nil {
+		return false
+	}
+	if r.Close {
+		defer r.Body.Close()
+	}
+	err := ServeResponse(w, resp)
+	if err != nil {
+		doError(ctx, err)
+	}
+	return true
+}
+
+func doResponse(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
+	resp, err := ctx.Prx.Rt.RoundTrip(r)
+	if err != nil {
+		if r.Close {
+			defer r.Body.Close()
+		}
+		doError(ctx, err)
+		return false
+	}
+	if ctx.Prx.OnResponse != nil {
+		ctx.Prx.OnResponse(ctx, r, resp)
+	}
+	err = ServeResponse(w, resp)
+	if err != nil {
+		doError(ctx, err)
+	}
+	return true
+}
+
 func NewProxy() (*Proxy, error) {
 	result := &Proxy{
 		Rt: &http.Transport{TLSClientConfig: &tls.Config{},
@@ -96,6 +144,19 @@ func (prx *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if doAuth(ctx, w, r) {
+		return
+	}
+	removeProxyHeaders(r)
+
+	// doConnect
+
+	req := r
+
+	if doRequest(ctx, w, req) {
+		return
+	}
+
+	if doResponse(ctx, w, req) {
 		return
 	}
 }
