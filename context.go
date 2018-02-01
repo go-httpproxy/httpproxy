@@ -1,7 +1,8 @@
 package httpproxy
 
 type Context struct {
-	Prx       *Proxy
-	SessionNo int64
-	UserData  interface{}
+	Prx           *Proxy
+	SessionNo     int64
+	ConnectAction ConnectAction
+	UserData      interface{}
 }

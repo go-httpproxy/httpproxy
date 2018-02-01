@@ -3,18 +3,25 @@ package httpproxy
 import (
 	"crypto/tls"
 	"encoding/base64"
+	"fmt"
+	"io"
+	"net"
 	"net/http"
+	"regexp"
 	"strings"
+	"sync"
 	"sync/atomic"
 )
 
 type ConnectAction int
 
 const (
-	ConnectAccept = ConnectAction(iota)
-	ConnectReject
+	ConnectNone = ConnectAction(iota)
+	ConnectOk
 	ConnectMitm
 )
+
+var hasPort = regexp.MustCompile(`:\d+$`)
 
 type Proxy struct {
 	SessionNo  int64
@@ -78,6 +85,77 @@ func doAuth(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
 		doError(ctx, err)
 	}
 	return true
+}
+
+func doConnect(ctx *Context, w http.ResponseWriter, r *http.Request) (w2 http.ResponseWriter, r2 *http.Request) {
+	if r.Method != "CONNECT" {
+		w2, r2 = w, r
+		return
+	}
+	hij, ok := w.(http.Hijacker)
+	if !ok {
+		if r.Close {
+			defer r.Body.Close()
+		}
+		err := fmt.Errorf("httpserver does not support hijacking")
+		doError(ctx, err)
+		return
+	}
+	hijConn, _, err := hij.Hijack()
+	if err != nil {
+		if r.Close {
+			defer r.Body.Close()
+		}
+		doError(ctx, err)
+		return
+	}
+	ctx.ConnectAction = ConnectOk
+	host := r.URL.Host
+	if ctx.Prx.OnConnect != nil {
+		ctx.ConnectAction, host = ctx.Prx.OnConnect(ctx, host)
+		if ctx.ConnectAction == ConnectNone {
+			ctx.ConnectAction = ConnectOk
+		}
+	}
+	if !hasPort.MatchString(host) {
+		host += ":80"
+	}
+	switch ctx.ConnectAction {
+	case ConnectOk:
+		targetConn, err := net.Dial("tcp", host)
+		if err != nil {
+			hijConn.Close()
+			doError(ctx, err)
+			return
+		}
+		_, err = hijConn.Write([]byte("HTTP/1.0 200 OK\r\n\r\n"))
+		if err != nil {
+			hijConn.Close()
+			targetConn.Close()
+			doError(ctx, err)
+			return
+		}
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			_, err := io.Copy(targetConn, hijConn)
+			if err != nil {
+				doError(ctx, err)
+			}
+			wg.Done()
+		}()
+		go func() {
+			_, err := io.Copy(hijConn, targetConn)
+			if err != nil {
+				doError(ctx, err)
+			}
+			wg.Done()
+		}()
+		hijConn.Close()
+		targetConn.Close()
+	}
+
+	return
 }
 
 func doRequest(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
@@ -148,15 +226,15 @@ func (prx *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	removeProxyHeaders(r)
 
-	// doConnect
-
-	req := r
-
-	if doRequest(ctx, w, req) {
+	if w2, r2 := doConnect(ctx, w, r); r2 != nil {
+		w, r = w2, r2
+	} else {
 		return
 	}
 
-	if doResponse(ctx, w, req) {
+	if doRequest(ctx, w, r) {
 		return
 	}
+
+	doResponse(ctx, w, r)
 }

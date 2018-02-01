@@ -20,7 +20,7 @@ func OnAuth(ctx *httpproxy.Context, user string, pass string) bool {
 }
 
 func OnConnect(ctx *httpproxy.Context, host string) (httpproxy.ConnectAction, string) {
-	return httpproxy.ConnectAccept, host
+	return httpproxy.ConnectOk, host
 }
 
 func OnRequest(ctx *httpproxy.Context, req *http.Request) *http.Response {
@@ -28,11 +28,12 @@ func OnRequest(ctx *httpproxy.Context, req *http.Request) *http.Response {
 }
 
 func OnResponse(ctx *httpproxy.Context, req *http.Request, resp *http.Response) {
-
+	resp.Header.Add("Via", "test")
 }
 
 func main() {
 	prx, _ := httpproxy.NewProxy()
 	prx.OnError = OnError
+	prx.OnResponse = OnResponse
 	http.ListenAndServe(":8080", prx)
 }
