@@ -8,9 +8,12 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/url"
 	"strings"
 	"sync"
+)
+
+var (
+	ErrAbsURLAfterConnect = &http.ProtocolError{"Absolute URL after CONNECT"}
 )
 
 func doError(ctx *Context, error error) {
@@ -133,7 +136,6 @@ func doConnect(ctx *Context, w http.ResponseWriter, r *http.Request) (w2 http.Re
 		hijConn.Close()
 		targetConn.Close()
 	case ConnectMitm:
-		//tlsConfig := &tls.Config{InsecureSkipVerify: true}
 		tlsConfig := &tls.Config{}
 		cert, err := signHosts(ctx.Prx.Ca, []string{stripPort(host)})
 		if err != nil {
@@ -160,14 +162,19 @@ func doConnect(ctx *Context, w http.ResponseWriter, r *http.Request) (w2 http.Re
 		req, err := http.ReadRequest(hijTlsReader)
 		if err != nil {
 			hijTlsConn.Close()
-			if err != io.EOF {
-				doError(ctx, err)
-			}
+			doError(ctx, err)
 			return
 		}
 
 		req.RemoteAddr = r.RemoteAddr
-		req.URL, _ = url.Parse("https://" + host + req.URL.String()) //!
+		if req.URL.IsAbs() {
+			hijTlsConn.Close()
+			err := ErrAbsURLAfterConnect
+			doError(ctx, err)
+			return
+		}
+		req.URL.Scheme = "https"
+		req.URL.Host = host
 		w2 = NewConnResponseWriter(hijTlsConn)
 		r2 = req
 		return

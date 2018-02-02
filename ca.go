@@ -1,13 +1,13 @@
 package httpproxy
 
 import (
-	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"math/big"
+	mrand "math/rand"
 	"net"
 	"sort"
 	"time"
@@ -105,13 +105,11 @@ func signHosts(ca tls.Certificate, hosts []string) (cert tls.Certificate, error 
 	}
 	start := time.Unix(0, 0)
 	end, _ := time.Parse("2006-01-02", "2038-01-19")
-	serial := hashSortedBigInt(append(hosts, "a"))
+	serial := hashSortedBigInt(append(hosts, "1"))
 	template := x509.Certificate{
-		SerialNumber: serial,
-		Issuer:       x509ca.Subject,
-		Subject: pkix.Name{
-			Organization: []string{"httpproxy"},
-		},
+		SerialNumber:          serial,
+		Issuer:                x509ca.Subject,
+		Subject:               pkix.Name{},
 		NotBefore:             start,
 		NotAfter:              end,
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
@@ -125,7 +123,9 @@ func signHosts(ca tls.Certificate, hosts []string) (cert tls.Certificate, error 
 			template.DNSNames = append(template.DNSNames, h)
 		}
 	}
-	rnd := rand.Reader
+
+	rnd := mrand.New(mrand.NewSource(serial.Int64()))
+
 	var certPriv *rsa.PrivateKey
 	if certPriv, error = rsa.GenerateKey(rnd, 1024); error != nil {
 		return
