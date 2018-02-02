@@ -7,8 +7,8 @@ import (
 	"github.com/go-httpproxy/httpproxy"
 )
 
-func OnError(ctx *httpproxy.Context, when string, error error) {
-	log.Printf("%s %s", when, error)
+func OnError(ctx *httpproxy.Context, when string, err *httpproxy.Error, opErr error) {
+	log.Printf("%s %s %s", when, err, opErr)
 }
 
 func OnAccept(ctx *httpproxy.Context, req *http.Request) *http.Response {

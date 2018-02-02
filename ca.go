@@ -98,23 +98,6 @@ s39uFDUnxsMb2Nl3JcNJHYBTm9ubjAZSo/3NuB0z/Gm+ssOcExTD//vW7BxxSAcs
 /xlPPTPbY5qoMAT7kK71kd4Ypnqbcs3UPpAHtcPkjWpuWOlebK0J7UYToj4f
 -----END RSA PRIVATE KEY-----`)
 
-func hashSorted(lst []string) []byte {
-	c := make([]string, len(lst))
-	copy(c, lst)
-	sort.Strings(c)
-	h := sha1.New()
-	for _, s := range c {
-		h.Write([]byte(s + ","))
-	}
-	return h.Sum(nil)
-}
-
-func hashSortedBigInt(lst []string) *big.Int {
-	rv := new(big.Int)
-	rv.SetBytes(hashSorted(lst))
-	return rv
-}
-
 func signHosts(ca tls.Certificate, hosts []string) (cert tls.Certificate, error error) {
 	var x509ca *x509.Certificate
 	if x509ca, error = x509.ParseCertificate(ca.Certificate[0]); error != nil {
@@ -155,4 +138,21 @@ func signHosts(ca tls.Certificate, hosts []string) (cert tls.Certificate, error 
 		Certificate: [][]byte{derBytes, ca.Certificate[0]},
 		PrivateKey:  certPriv,
 	}, nil
+}
+
+func hashSorted(lst []string) []byte {
+	c := make([]string, len(lst))
+	copy(c, lst)
+	sort.Strings(c)
+	h := sha1.New()
+	for _, s := range c {
+		h.Write([]byte(s + ","))
+	}
+	return h.Sum(nil)
+}
+
+func hashSortedBigInt(lst []string) *big.Int {
+	rv := new(big.Int)
+	rv.SetBytes(hashSorted(lst))
+	return rv
 }
