@@ -16,11 +16,13 @@ func OnAccept(ctx *httpproxy.Context, req *http.Request) *http.Response {
 }
 
 func OnAuth(ctx *httpproxy.Context, user string, pass string) bool {
-	return true
+	if user == "test" && pass == "1234" {
+		return true
+	}
+	return false
 }
 
 func OnConnect(ctx *httpproxy.Context, host string) (httpproxy.ConnectAction, string) {
-	//return httpproxy.ConnectOk, host
 	return httpproxy.ConnectMitm, host
 }
 
@@ -35,7 +37,11 @@ func OnResponse(ctx *httpproxy.Context, req *http.Request, resp *http.Response) 
 func main() {
 	prx, _ := httpproxy.NewProxy()
 	prx.OnError = OnError
-	prx.OnResponse = OnResponse
+	prx.OnAccept = OnAccept
+	prx.OnAuth = OnAuth
 	prx.OnConnect = OnConnect
+	prx.OnRequest = OnRequest
+	prx.OnResponse = OnResponse
+
 	http.ListenAndServe(":8080", prx)
 }
