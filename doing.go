@@ -90,19 +90,19 @@ func doConnect(ctx *Context, w http.ResponseWriter, r *http.Request) (w2 http.Re
 		doError(ctx, err)
 		return
 	}
-	ctx.ConnectAction = ConnectOk
+	ctx.ConnectAction = ConnectProxy
 	host := r.URL.Host
 	if ctx.Prx.OnConnect != nil {
 		ctx.ConnectAction, host = ctx.Prx.OnConnect(ctx, host)
 		if ctx.ConnectAction == ConnectNone {
-			ctx.ConnectAction = ConnectOk
+			ctx.ConnectAction = ConnectProxy
 		}
 	}
 	if !hasPort.MatchString(host) {
 		host += ":80"
 	}
 	switch ctx.ConnectAction {
-	case ConnectOk:
+	case ConnectProxy:
 		targetConn, err := net.Dial("tcp", host)
 		if err != nil {
 			hijConn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))

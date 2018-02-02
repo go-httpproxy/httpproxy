@@ -10,7 +10,7 @@ type ConnectAction int
 
 const (
 	ConnectNone = ConnectAction(iota)
-	ConnectOk
+	ConnectProxy
 	ConnectMitm
 )
 
