@@ -5,9 +5,23 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"net/http"
+	"regexp"
 	"strconv"
+	"strings"
+	"sync"
 )
+
+var hasPort = regexp.MustCompile(`:\d+$`)
+
+func stripPort(s string) string {
+	ix := strings.IndexRune(s, ':')
+	if ix == -1 {
+		return s
+	}
+	return s[:ix]
+}
 
 func InMemoryResponse(code int, header http.Header, body []byte) *http.Response {
 	if header == nil {
@@ -24,9 +38,9 @@ func InMemoryResponse(code int, header http.Header, body []byte) *http.Response 
 	return &http.Response{
 		Status:        fmt.Sprintf("%d%s", code, st),
 		StatusCode:    code,
-		Proto:         "HTTP/1.0",
+		Proto:         "HTTP/1.1",
 		ProtoMajor:    1,
-		ProtoMinor:    0,
+		ProtoMinor:    1,
 		Header:        header,
 		Body:          ioutil.NopCloser(bytes.NewBuffer(body)),
 		ContentLength: int64(len(body)),
@@ -68,4 +82,50 @@ func removeProxyHeaders(r *http.Request) {
 	//   options that are desired for that particular connection and MUST NOT
 	//   be communicated by proxies over further connections.
 	r.Header.Del("Connection")
+}
+
+type ConnResponseWriter struct {
+	Conn        net.Conn
+	mu          sync.Mutex
+	code        int
+	header      http.Header
+	headersSent bool
+}
+
+func NewConnResponseWriter(conn net.Conn) *ConnResponseWriter {
+	return &ConnResponseWriter{Conn: conn, header: make(http.Header)}
+}
+
+func (c *ConnResponseWriter) Header() http.Header {
+	return c.header
+}
+
+func (c *ConnResponseWriter) Write(body []byte) (int, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if !c.headersSent {
+		c.headersSent = true
+		st := http.StatusText(c.code)
+		if st != "" {
+			st = " " + st
+		}
+		if _, err := io.WriteString(c.Conn, fmt.Sprintf("HTTP/1.1 %d%s\r\n", c.code, st)); err != nil {
+			return 0, err
+		}
+		if err := c.header.Write(c.Conn); err != nil {
+			return 0, err
+		}
+		if _, err := io.WriteString(c.Conn, "\r\n"); err != nil {
+			return 0, err
+		}
+	}
+	return c.Conn.Write(body)
+}
+
+func (c *ConnResponseWriter) WriteHeader(code int) {
+	c.code = code
+}
+
+func (c *ConnResponseWriter) Close() error {
+	return c.Conn.Close()
 }
