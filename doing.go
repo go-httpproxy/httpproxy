@@ -8,19 +8,29 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"sync"
+	"syscall"
 )
 
 var (
 	ErrAbsURLAfterConnect = &http.ProtocolError{"Absolute URL after CONNECT"}
 )
 
-func doError(ctx *Context, error error) {
+func doError(ctx *Context, when string, error error) {
 	if ctx.Prx.OnError == nil {
 		return
 	}
-	ctx.Prx.OnError(ctx, error)
+	if error == io.EOF {
+		return
+	}
+	if err, ok := error.(*net.OpError); ok {
+		if err, ok := err.Err.(*os.SyscallError); ok && (err.Err == syscall.EPIPE || err.Err == syscall.ECONNRESET) {
+			return
+		}
+	}
+	ctx.Prx.OnError(ctx, when, error)
 }
 
 func doAccept(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
@@ -36,7 +46,7 @@ func doAccept(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
 	}
 	err := ServeResponse(w, resp)
 	if err != nil {
-		doError(ctx, err)
+		doError(ctx, "Accept", err)
 	}
 	return true
 }
@@ -63,7 +73,7 @@ func doAuth(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
 	}
 	err := ServeInMemory(w, 407, nil, []byte("Proxy Authentication Required"))
 	if err != nil {
-		doError(ctx, err)
+		doError(ctx, "Auth", err)
 	}
 	return true
 }
@@ -79,17 +89,18 @@ func doConnect(ctx *Context, w http.ResponseWriter, r *http.Request) (w2 http.Re
 			defer r.Body.Close()
 		}
 		err := fmt.Errorf("httpserver does not support hijacking")
-		doError(ctx, err)
+		doError(ctx, "Connect", err)
 		return
 	}
-	hijConn, _, err := hij.Hijack()
+	conn, _, err := hij.Hijack()
 	if err != nil {
 		if r.Close {
 			defer r.Body.Close()
 		}
-		doError(ctx, err)
+		doError(ctx, "Connect", err)
 		return
 	}
+	hijConn := conn.(*net.TCPConn)
 	ctx.ConnectAction = ConnectProxy
 	host := r.URL.Host
 	if ctx.Prx.OnConnect != nil {
@@ -103,17 +114,18 @@ func doConnect(ctx *Context, w http.ResponseWriter, r *http.Request) (w2 http.Re
 	}
 	switch ctx.ConnectAction {
 	case ConnectProxy:
-		targetConn, err := net.Dial("tcp", host)
+		conn, err := net.Dial("tcp", host)
 		if err != nil {
 			hijConn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
 			hijConn.Close()
-			doError(ctx, err)
+			doError(ctx, "Connect", err)
 			return
 		}
+		targetConn := conn.(*net.TCPConn)
 		if _, err := hijConn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n")); err != nil {
 			hijConn.Close()
 			targetConn.Close()
-			doError(ctx, err)
+			doError(ctx, "Connect", err)
 			return
 		}
 		var wg sync.WaitGroup
@@ -121,14 +133,14 @@ func doConnect(ctx *Context, w http.ResponseWriter, r *http.Request) (w2 http.Re
 		go func() {
 			_, err := io.Copy(targetConn, hijConn)
 			if err != nil {
-				doError(ctx, err)
+				doError(ctx, "Connect", err)
 			}
 			wg.Done()
 		}()
 		go func() {
 			_, err := io.Copy(hijConn, targetConn)
 			if err != nil {
-				doError(ctx, err)
+				doError(ctx, "Connect", err)
 			}
 			wg.Done()
 		}()
@@ -140,37 +152,33 @@ func doConnect(ctx *Context, w http.ResponseWriter, r *http.Request) (w2 http.Re
 		cert, err := signHosts(ctx.Prx.Ca, []string{stripPort(host)})
 		if err != nil {
 			hijConn.Close()
-			doError(ctx, err)
+			doError(ctx, "Connect", err)
 			return
 		}
 		tlsConfig.Certificates = append(tlsConfig.Certificates, cert)
-
 		if _, err := hijConn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n")); err != nil {
 			hijConn.Close()
-			doError(ctx, err)
+			doError(ctx, "Connect", err)
 			return
 		}
-
 		hijTlsConn := tls.Server(hijConn, tlsConfig)
 		if err := hijTlsConn.Handshake(); err != nil {
 			hijTlsConn.Close()
-			doError(ctx, err)
+			doError(ctx, "Connect", err)
 			return
 		}
-
 		hijTlsReader := bufio.NewReader(hijTlsConn)
 		req, err := http.ReadRequest(hijTlsReader)
 		if err != nil {
 			hijTlsConn.Close()
-			doError(ctx, err)
+			doError(ctx, "Connect", err)
 			return
 		}
-
 		req.RemoteAddr = r.RemoteAddr
 		if req.URL.IsAbs() {
 			hijTlsConn.Close()
 			err := ErrAbsURLAfterConnect
-			doError(ctx, err)
+			doError(ctx, "Connect", err)
 			return
 		}
 		req.URL.Scheme = "https"
@@ -179,7 +187,6 @@ func doConnect(ctx *Context, w http.ResponseWriter, r *http.Request) (w2 http.Re
 		r2 = req
 		return
 	}
-
 	return
 }
 
@@ -191,7 +198,7 @@ func doRequest(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
 		}
 		err := ServeInMemory(w, 500, nil, []byte("This is a proxy server. Does not respond to non-proxy requests."))
 		if err != nil {
-			doError(ctx, err)
+			doError(ctx, "Request", err)
 		}
 		return true
 	}
@@ -207,7 +214,7 @@ func doRequest(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
 	}
 	err := ServeResponse(w, resp)
 	if err != nil {
-		doError(ctx, err)
+		doError(ctx, "Request", err)
 	}
 	return true
 }
@@ -218,7 +225,7 @@ func doResponse(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
 		if r.Close {
 			defer r.Body.Close()
 		}
-		doError(ctx, err)
+		doError(ctx, "Response", err)
 		return false
 	}
 	if ctx.Prx.OnResponse != nil {
@@ -226,7 +233,7 @@ func doResponse(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
 	}
 	err = ServeResponse(w, resp)
 	if err != nil {
-		doError(ctx, err)
+		doError(ctx, "Response", err)
 	}
 	return true
 }

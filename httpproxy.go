@@ -19,7 +19,7 @@ type Proxy struct {
 	Rt         http.RoundTripper
 	Ca         tls.Certificate
 	UserData   interface{}
-	OnError    func(ctx *Context, error error)
+	OnError    func(ctx *Context, when string, error error)
 	OnAccept   func(ctx *Context, req *http.Request) *http.Response
 	OnAuth     func(ctx *Context, user string, pass string) bool
 	OnConnect  func(ctx *Context, host string) (ConnectAction, string)
