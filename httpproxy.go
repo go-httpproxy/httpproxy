@@ -6,14 +6,17 @@ import (
 	"sync/atomic"
 )
 
+// ConnectAction specifies action of after the CONNECT.
 type ConnectAction int
 
+// Constants of ConnectAction type.
 const (
 	ConnectNone = ConnectAction(iota)
 	ConnectProxy
 	ConnectMitm
 )
 
+// Proxy defines parameters for running an HTTP Proxy. Also implements http.Handler interface for ListenAndServe function.
 type Proxy struct {
 	SessionNo  int64
 	Rt         http.RoundTripper
@@ -27,10 +30,12 @@ type Proxy struct {
 	OnResponse func(ctx *Context, req *http.Request, resp *http.Response)
 }
 
+// NewProxy returns a new Proxy has defaults.
 func NewProxy() (*Proxy, error) {
 	return NewProxyWithCert(nil, nil)
 }
 
+// NewProxyWithCert returns a new Proxy given certificate and key.
 func NewProxyWithCert(caCert, caKey []byte) (result *Proxy, error error) {
 	result = &Proxy{
 		Rt: &http.Transport{TLSClientConfig: &tls.Config{},
@@ -49,6 +54,7 @@ func NewProxyWithCert(caCert, caKey []byte) (result *Proxy, error error) {
 	return
 }
 
+// ServeHTTP has been needed for implementing http.Handler.
 func (prx *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := &Context{Prx: prx, SessionNo: atomic.AddInt64(&prx.SessionNo, 1)}
 
