@@ -39,7 +39,6 @@ func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
 	if resp.Close {
 		defer resp.Body.Close()
 	}
-	w.WriteHeader(resp.StatusCode)
 	h := w.Header()
 	for k, v := range resp.Header {
 		for _, v1 := range v {
@@ -60,14 +59,16 @@ func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
 	}
 	switch te {
 	case "":
+		w.WriteHeader(resp.StatusCode)
 		if _, err := io.Copy(w, resp.Body); err != nil {
 			return err
 		}
 	case "chunked":
-		w2 := httputil.NewChunkedWriter(w)
 		h.Add("Transfer-Encoding", "chunked")
 		//h.Del("Content-Length")
 		h.Set("Connection", "close")
+		w.WriteHeader(resp.StatusCode)
+		w2 := httputil.NewChunkedWriter(w)
 		if _, err := io.Copy(w2, resp.Body); err != nil {
 			return err
 		}
