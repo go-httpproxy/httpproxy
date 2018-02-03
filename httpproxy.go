@@ -82,6 +82,7 @@ func (prx *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if r == nil {
 			break
 		}
+		ctx.SubSessionNo += 1
 		if b, err := doRequest(ctx, w, r); err != nil {
 			break
 		} else {

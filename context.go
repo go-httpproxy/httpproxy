@@ -10,6 +10,7 @@ import (
 type Context struct {
 	Prx           *Proxy
 	SessionNo     int64
+	SubSessionNo  int64
 	ConnectAction ConnectAction
 	ConnectReq    *http.Request
 	ConnectHost   string

@@ -39,6 +39,7 @@ func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
 	if resp.Close {
 		defer resp.Body.Close()
 	}
+	w.WriteHeader(resp.StatusCode)
 	h := w.Header()
 	for k, v := range resp.Header {
 		for _, v1 := range v {
@@ -50,7 +51,6 @@ func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
 	} else {
 		h.Del("Content-Length")
 	}
-	w.WriteHeader(resp.StatusCode)
 	te := ""
 	if len(resp.TransferEncoding) > 0 {
 		if len(resp.TransferEncoding) > 1 {
