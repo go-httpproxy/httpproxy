@@ -57,7 +57,8 @@ func doAuth(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
 	if r.Close {
 		defer r.Body.Close()
 	}
-	err := ServeInMemory(w, 407, nil, []byte("Proxy Authentication Required"))
+	err := ServeInMemory(w, 407, map[string][]string{"Proxy-Authenticate": {"Basic"}},
+		[]byte("Proxy Authentication Required"))
 	if err != nil && !isConnectionClosed(err) {
 		doError(ctx, "Auth", ErrResponseWrite, err)
 	}
