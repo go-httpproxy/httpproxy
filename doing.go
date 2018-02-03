@@ -229,7 +229,7 @@ func doResponse(ctx *Context, w http.ResponseWriter, r *http.Request) (bool, err
 	if ctx.Prx.OnResponse != nil {
 		ctx.Prx.OnResponse(ctx, r, resp)
 	}
-	if ctx.ConnectAction == ConnectMitm {
+	if ctx.ConnectAction == ConnectMitm && ctx.Prx.MitmChunked {
 		resp.TransferEncoding = []string{"chunked"}
 	}
 	err = ServeResponse(w, resp)

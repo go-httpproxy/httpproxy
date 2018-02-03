@@ -43,6 +43,7 @@ func main() {
 	prx.OnConnect = OnConnect
 	prx.OnRequest = OnRequest
 	prx.OnResponse = OnResponse
+	prx.MitmChunked = true
 
 	http.ListenAndServe(":8080", prx)
 }

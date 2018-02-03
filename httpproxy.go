@@ -18,16 +18,17 @@ const (
 
 // Proxy defines parameters for running an HTTP Proxy. Also implements http.Handler interface for ListenAndServe function.
 type Proxy struct {
-	SessionNo  int64
-	Rt         http.RoundTripper
-	Ca         tls.Certificate
-	UserData   interface{}
-	OnError    func(ctx *Context, when string, err *Error, opErr error)
-	OnAccept   func(ctx *Context, req *http.Request) *http.Response
-	OnAuth     func(ctx *Context, user string, pass string) bool
-	OnConnect  func(ctx *Context, host string) (ConnectAction, string)
-	OnRequest  func(ctx *Context, req *http.Request) *http.Response
-	OnResponse func(ctx *Context, req *http.Request, resp *http.Response)
+	SessionNo   int64
+	Rt          http.RoundTripper
+	Ca          tls.Certificate
+	UserData    interface{}
+	OnError     func(ctx *Context, when string, err *Error, opErr error)
+	OnAccept    func(ctx *Context, req *http.Request) *http.Response
+	OnAuth      func(ctx *Context, user string, pass string) bool
+	OnConnect   func(ctx *Context, host string) (ConnectAction, string)
+	OnRequest   func(ctx *Context, req *http.Request) *http.Response
+	OnResponse  func(ctx *Context, req *http.Request, resp *http.Response)
+	MitmChunked bool
 }
 
 // NewProxy returns a new Proxy has defaults.
@@ -76,7 +77,9 @@ func (prx *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	for {
 		var cyclic = false
 		if ctx.ConnectAction == ConnectMitm {
-			cyclic = true
+			if prx.MitmChunked {
+				cyclic = true
+			}
 			r = doMitm(ctx, w)
 		}
 		if r == nil {
