@@ -31,13 +31,13 @@ type Proxy struct {
 	MitmChunked bool
 }
 
-// NewProxy returns a new Proxy has defaults.
+// NewProxy returns a new Proxy has default certificate and key.
 func NewProxy() (*Proxy, error) {
-	return NewProxyWithCert(nil, nil)
+	return NewProxyCert(nil, nil)
 }
 
-// NewProxyWithCert returns a new Proxy given certificate and key.
-func NewProxyWithCert(caCert, caKey []byte) (result *Proxy, error error) {
+// NewProxyCert returns a new Proxy given certificate and key.
+func NewProxyCert(caCert, caKey []byte) (result *Proxy, error error) {
 	result = &Proxy{
 		Rt: &http.Transport{TLSClientConfig: &tls.Config{},
 			Proxy: http.ProxyFromEnvironment},
