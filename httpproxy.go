@@ -67,23 +67,37 @@ func (prx *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	removeProxyHeaders(r)
 
-	if w2, r2 := doConnect(ctx, w, r); r2 != nil {
-		if r != r2 {
-			ctx.ConnectReq = r
-		}
-		w, r = w2, r2
+	if w2 := doConnect(ctx, w, r); w2 != nil {
+		w = w2
 	} else {
 		return
 	}
 
-	if doRequest(ctx, w, r) {
-		if w2, ok := w.(*ConnResponseWriter); ok {
-			w2.Close()
+	for {
+		var cyclic = false
+		if ctx.ConnectAction == ConnectMitm {
+			cyclic = true
+			r = doMitm(ctx, w)
 		}
-		return
+		if r == nil {
+			break
+		}
+		if b, err := doRequest(ctx, w, r); err != nil {
+			break
+		} else {
+			if b {
+				if !cyclic {
+					break
+				} else {
+					continue
+				}
+			}
+		}
+		if b, err := doResponse(ctx, w, r); err != nil || !b || !cyclic {
+			break
+		}
 	}
 
-	doResponse(ctx, w, r)
 	if w2, ok := w.(*ConnResponseWriter); ok {
 		w2.Close()
 	}

@@ -8,14 +8,15 @@ import (
 )
 
 var (
-	ErrResponseWrite       = NewError("response write")
-	ErrRequestRead         = NewError("request read")
-	ErrRemoteConnect       = NewError("remote connect")
-	ErrNotSupportHijacking = NewError("httpserver does not support hijacking")
-	ErrTLSSignHost         = NewError("TLS sign host")
-	ErrTLSHandshake        = NewError("TLS handshake")
-	ErrAbsURLAfterCONNECT  = NewError("absolute URL after CONNECT")
-	ErrRoundTrip           = NewError("round trip")
+	ErrResponseWrite               = NewError("response write")
+	ErrRequestRead                 = NewError("request read")
+	ErrRemoteConnect               = NewError("remote connect")
+	ErrNotSupportHijacking         = NewError("httpserver does not support hijacking")
+	ErrTLSSignHost                 = NewError("TLS sign host")
+	ErrTLSHandshake                = NewError("TLS handshake")
+	ErrAbsURLAfterCONNECT          = NewError("absolute URL after CONNECT")
+	ErrRoundTrip                   = NewError("round trip")
+	ErrUnsupportedTransferEncoding = NewError("unsupported transfer encoding")
 )
 
 type Error struct {
