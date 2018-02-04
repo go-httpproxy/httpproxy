@@ -22,7 +22,7 @@ func OnAuth(ctx *httpproxy.Context, user string, pass string) bool {
 	return false
 }
 
-func OnConnect(ctx *httpproxy.Context, host string) (httpproxy.ConnectAction, string) {
+func OnConnect(ctx *httpproxy.Context, host string) (ConnectAction httpproxy.ConnectAction, newHost string) {
 	return httpproxy.ConnectMitm, host
 }
 

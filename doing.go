@@ -83,9 +83,13 @@ func doConnect(ctx *Context, w http.ResponseWriter, r *http.Request) (w2 http.Re
 	ctx.ConnectReq = r
 	host := r.URL.Host
 	if ctx.Prx.OnConnect != nil {
-		ctx.ConnectAction, host = ctx.Prx.OnConnect(ctx, host)
+		var newHost string
+		ctx.ConnectAction, newHost = ctx.Prx.OnConnect(ctx, host)
 		if ctx.ConnectAction == ConnectNone {
 			ctx.ConnectAction = ConnectProxy
+		}
+		if newHost != "" {
+			host = newHost
 		}
 	}
 	if !hasPort.MatchString(host) {
@@ -145,23 +149,23 @@ func doConnect(ctx *Context, w http.ResponseWriter, r *http.Request) (w2 http.Re
 			}
 			return
 		}
-		ctx.hijTlsConn = tls.Server(hijConn, tlsConfig)
-		if err := ctx.hijTlsConn.Handshake(); err != nil {
-			ctx.hijTlsConn.Close()
+		ctx.hijTLSConn = tls.Server(hijConn, tlsConfig)
+		if err := ctx.hijTLSConn.Handshake(); err != nil {
+			ctx.hijTLSConn.Close()
 			if !isConnectionClosed(err) {
 				doError(ctx, "Connect", ErrTLSHandshake, err)
 			}
 			return
 		}
-		ctx.hijTlsReader = bufio.NewReader(ctx.hijTlsConn)
-		w2 = NewConnResponseWriter(ctx.hijTlsConn)
+		ctx.hijTLSReader = bufio.NewReader(ctx.hijTLSConn)
+		w2 = NewConnResponseWriter(ctx.hijTLSConn)
 		return
 	}
 	return
 }
 
 func doMitm(ctx *Context, w http.ResponseWriter) (r *http.Request) {
-	req, err := http.ReadRequest(ctx.hijTlsReader)
+	req, err := http.ReadRequest(ctx.hijTLSReader)
 	if err != nil {
 		if !isConnectionClosed(err) {
 			doError(ctx, "Request", ErrRequestRead, err)

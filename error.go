@@ -7,6 +7,7 @@ import (
 	"syscall"
 )
 
+// Library specific errors.
 var (
 	ErrResponseWrite               = NewError("response write")
 	ErrRequestRead                 = NewError("request read")
@@ -19,14 +20,17 @@ var (
 	ErrUnsupportedTransferEncoding = NewError("unsupported transfer encoding")
 )
 
+// Error struct is base of library specific errors.
 type Error struct {
 	ErrString string
 }
 
+// NewError returns a new Error.
 func NewError(errString string) *Error {
 	return &Error{errString}
 }
 
+// Error implements error interface.
 func (e *Error) Error() string {
 	return e.ErrString
 }
