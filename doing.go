@@ -30,6 +30,9 @@ func doAccept(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
 }
 
 func doAuth(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
+	if r.Method != "CONNECT" && !r.URL.IsAbs() {
+		return false
+	}
 	if ctx.Prx.OnAuth == nil {
 		return false
 	}
