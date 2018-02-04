@@ -56,8 +56,8 @@ type Proxy struct {
 
 	// Connect handler. It sets connect action and new host.
 	// If len(newhost) > 0, host changes.
-    OnConnect func(ctx *Context, host string) (ConnectAction ConnectAction,
-        newHost string)
+	OnConnect func(ctx *Context, host string) (ConnectAction ConnectAction,
+		newHost string)
 
 	// Request handler. It greets remote request.
 	// If it returns non-nil response, stops processing remote request.
