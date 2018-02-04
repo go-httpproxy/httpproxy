@@ -23,10 +23,10 @@ type Proxy struct {
 	Ca          tls.Certificate
 	UserData    interface{}
 	OnError     func(ctx *Context, when string, err *Error, opErr error)
-	OnAccept    func(ctx *Context, req *http.Request) *http.Response
+	OnAccept    func(ctx *Context, w http.ResponseWriter, r *http.Request) bool
 	OnAuth      func(ctx *Context, user string, pass string) bool
 	OnConnect   func(ctx *Context, host string) (ConnectAction, string)
-	OnRequest   func(ctx *Context, req *http.Request) *http.Response
+	OnRequest   func(ctx *Context, req *http.Request) (resp *http.Response)
 	OnResponse  func(ctx *Context, req *http.Request, resp *http.Response)
 	MitmChunked bool
 }
@@ -40,7 +40,7 @@ func NewProxy() (*Proxy, error) {
 func NewProxyCert(caCert, caKey []byte) (result *Proxy, error error) {
 	result = &Proxy{
 		Rt: &http.Transport{TLSClientConfig: &tls.Config{},
-			Proxy: http.ProxyFromEnvironment},
+			Proxy: http.ProxyFromEnvironment}, MitmChunked: true,
 	}
 	if caCert == nil {
 		caCert = DefaultCaCert

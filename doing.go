@@ -20,19 +20,11 @@ func doError(ctx *Context, when string, err *Error, opErr error) {
 }
 
 func doAccept(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
-	if ctx.Prx.OnAccept == nil {
-		return false
-	}
-	resp := ctx.Prx.OnAccept(ctx, r)
-	if resp == nil {
+	if ctx.Prx.OnAccept == nil || !ctx.Prx.OnAccept(ctx, w, r) {
 		return false
 	}
 	if r.Close {
 		defer r.Body.Close()
-	}
-	err := ServeResponse(w, resp)
-	if err != nil && !isConnectionClosed(err) {
-		doError(ctx, "Accept", ErrResponseWrite, err)
 	}
 	return true
 }
@@ -172,13 +164,13 @@ func doMitm(ctx *Context, w http.ResponseWriter) (r *http.Request) {
 	req, err := http.ReadRequest(ctx.hijTlsReader)
 	if err != nil {
 		if !isConnectionClosed(err) {
-			doError(ctx, "Connect", ErrRequestRead, err)
+			doError(ctx, "Request", ErrRequestRead, err)
 		}
 		return
 	}
 	req.RemoteAddr = ctx.ConnectReq.RemoteAddr
 	if req.URL.IsAbs() {
-		doError(ctx, "Connect", ErrAbsURLAfterCONNECT, nil)
+		doError(ctx, "Request", ErrAbsURLAfterCONNECT, nil)
 		return
 	}
 	req.URL.Scheme = "https"
@@ -209,6 +201,10 @@ func doRequest(ctx *Context, w http.ResponseWriter, r *http.Request) (bool, erro
 	if r.Close {
 		defer r.Body.Close()
 	}
+	resp.TransferEncoding = nil
+	if ctx.ConnectAction == ConnectMitm && ctx.Prx.MitmChunked {
+		resp.TransferEncoding = []string{"chunked"}
+	}
 	err := ServeResponse(w, resp)
 	if err != nil && !isConnectionClosed(err) {
 		doError(ctx, "Request", ErrResponseWrite, err)
@@ -230,6 +226,7 @@ func doResponse(ctx *Context, w http.ResponseWriter, r *http.Request) (bool, err
 	if ctx.Prx.OnResponse != nil {
 		ctx.Prx.OnResponse(ctx, r, resp)
 	}
+	resp.TransferEncoding = nil
 	if ctx.ConnectAction == ConnectMitm && ctx.Prx.MitmChunked {
 		resp.TransferEncoding = []string{"chunked"}
 	}

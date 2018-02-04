@@ -50,6 +50,7 @@ func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
 	} else {
 		h.Del("Content-Length")
 	}
+	h.Del("Transfer-Encoding")
 	te := ""
 	if len(resp.TransferEncoding) > 0 {
 		if len(resp.TransferEncoding) > 1 {

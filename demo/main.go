@@ -11,8 +11,8 @@ func OnError(ctx *httpproxy.Context, when string, err *httpproxy.Error, opErr er
 	log.Printf("%s %s %s", when, err, opErr)
 }
 
-func OnAccept(ctx *httpproxy.Context, req *http.Request) *http.Response {
-	return nil
+func OnAccept(ctx *httpproxy.Context, w http.ResponseWriter, r *http.Request) bool {
+	return false
 }
 
 func OnAuth(ctx *httpproxy.Context, user string, pass string) bool {
@@ -26,8 +26,9 @@ func OnConnect(ctx *httpproxy.Context, host string) (httpproxy.ConnectAction, st
 	return httpproxy.ConnectMitm, host
 }
 
-func OnRequest(ctx *httpproxy.Context, req *http.Request) *http.Response {
-	return nil
+func OnRequest(ctx *httpproxy.Context, req *http.Request) (resp *http.Response) {
+	log.Printf("Request %s", req.URL.String())
+	return
 }
 
 func OnResponse(ctx *httpproxy.Context, req *http.Request, resp *http.Response) {
