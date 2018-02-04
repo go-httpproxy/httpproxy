@@ -11,35 +11,75 @@ type ConnectAction int
 
 // Constants of ConnectAction type.
 const (
+	// ConnectNone specifies that proxy request is not CONNECT.
+	// If it returned in OnConnect, changed to ConnectProxy.
 	ConnectNone = ConnectAction(iota)
+
+	// ConnectProxy specifies directly socket proxy after the CONNECT.
 	ConnectProxy
+
+	// ConnectMitm specifies proxy "Man in the Middle" style attack
+	// after the CONNECT.
 	ConnectMitm
 )
 
-// Proxy defines parameters for running an HTTP Proxy. Also implements http.Handler interface for ListenAndServe function.
+// Proxy defines parameters for running an HTTP Proxy. It implements
+// http.Handler interface for ListenAndServe function. If you need, you must
+// fill Proxy struct before handling requests.
 type Proxy struct {
-	SessionNo  int64
-	Rt         http.RoundTripper
-	Ca         tls.Certificate
-	UserData   interface{}
-	OnError    func(ctx *Context, when string, err *Error, opErr error)
-	OnAccept   func(ctx *Context, req *http.Request) *http.Response
-	OnAuth     func(ctx *Context, user string, pass string) bool
-	OnConnect  func(ctx *Context, host string) (ConnectAction, string)
-	OnRequest  func(ctx *Context, req *http.Request) *http.Response
+	// Session number of last proxy request.
+	SessionNo int64
+
+	// RoundTripper interface to obtain remote response.
+	// By default, it uses &http.Transport{}.
+	Rt http.RoundTripper
+
+	// Certificate key pair.
+	Ca tls.Certificate
+
+	// User data to use free.
+	UserData interface{}
+
+	// Error handler.
+	OnError func(ctx *Context, when string, err *Error, opErr error)
+
+	// Accept handler. It greets proxy request like ServeHTTP function of
+	// http.Handler.
+	// If it returns true, stops processing proxy request.
+	OnAccept func(ctx *Context, w http.ResponseWriter, r *http.Request) bool
+
+	// Auth handler. If you need authentication, set this handler.
+	// If it returns true, authentication succeeded.
+	OnAuth func(ctx *Context, user string, pass string) bool
+
+	// Connect handler. It sets connect action and new host.
+	// If len(newhost) > 0, host changes.
+	OnConnect func(ctx *Context, host string) (ConnectAction ConnectAction,
+		newHost string)
+
+	// Request handler. It greets remote request.
+	// If it returns non-nil response, stops processing remote request.
+	OnRequest func(ctx *Context, req *http.Request) (resp *http.Response)
+
+	// Response handler. It greets remote response.
+	// Remote response sends after this handler.
 	OnResponse func(ctx *Context, req *http.Request, resp *http.Response)
+
+	// If ConnectAction is ConnectMitm, it sets chunked to Transfer-Encoding.
+	// By default, it is true.
+	MitmChunked bool
 }
 
-// NewProxy returns a new Proxy has defaults.
+// NewProxy returns a new Proxy has default certificate and key.
 func NewProxy() (*Proxy, error) {
-	return NewProxyWithCert(nil, nil)
+	return NewProxyCert(nil, nil)
 }
 
-// NewProxyWithCert returns a new Proxy given certificate and key.
-func NewProxyWithCert(caCert, caKey []byte) (result *Proxy, error error) {
+// NewProxyCert returns a new Proxy given certificate and key.
+func NewProxyCert(caCert, caKey []byte) (result *Proxy, error error) {
 	result = &Proxy{
 		Rt: &http.Transport{TLSClientConfig: &tls.Config{},
-			Proxy: http.ProxyFromEnvironment},
+			Proxy: http.ProxyFromEnvironment}, MitmChunked: true,
 	}
 	if caCert == nil {
 		caCert = DefaultCaCert
@@ -54,7 +94,7 @@ func NewProxyWithCert(caCert, caKey []byte) (result *Proxy, error error) {
 	return
 }
 
-// ServeHTTP has been needed for implementing http.Handler.
+// ServeHTTP implements http.Handler.
 func (prx *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := &Context{Prx: prx, SessionNo: atomic.AddInt64(&prx.SessionNo, 1)}
 
@@ -67,23 +107,40 @@ func (prx *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	removeProxyHeaders(r)
 
-	if w2, r2 := doConnect(ctx, w, r); r2 != nil {
-		if r != r2 {
-			ctx.ConnectReq = r
-		}
-		w, r = w2, r2
+	if w2 := doConnect(ctx, w, r); w2 != nil {
+		w = w2
 	} else {
 		return
 	}
 
-	if doRequest(ctx, w, r) {
-		if w2, ok := w.(*ConnResponseWriter); ok {
-			w2.Close()
+	for {
+		var cyclic = false
+		if ctx.ConnectAction == ConnectMitm {
+			if prx.MitmChunked {
+				cyclic = true
+			}
+			r = doMitm(ctx, w)
 		}
-		return
+		if r == nil {
+			break
+		}
+		ctx.SubSessionNo += 1
+		if b, err := doRequest(ctx, w, r); err != nil {
+			break
+		} else {
+			if b {
+				if !cyclic {
+					break
+				} else {
+					continue
+				}
+			}
+		}
+		if b, err := doResponse(ctx, w, r); err != nil || !b || !cyclic {
+			break
+		}
 	}
 
-	doResponse(ctx, w, r)
 	if w2, ok := w.(*ConnResponseWriter); ok {
 		w2.Close()
 	}

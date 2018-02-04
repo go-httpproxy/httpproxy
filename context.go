@@ -1,12 +1,38 @@
 package httpproxy
 
-import "net/http"
+import (
+	"bufio"
+	"crypto/tls"
+	"net/http"
+)
 
-// Context defines context of each proxy connection.
+// Context keeps context of each proxy request.
 type Context struct {
-	Prx           *Proxy
-	SessionNo     int64
+	// Pointer of Proxy struct handled this context.
+	// It's using internally. Don't change in Context struct!
+	Prx *Proxy
+
+	// Session number of this context obtained from Proxy struct.
+	SessionNo int64
+
+	// Sub session number of processing remote connection.
+	SubSessionNo int64
+
+	// Action of after the CONNECT, if proxy request method is CONNECT.
+	// It's using internally. Don't change in Context struct!
 	ConnectAction ConnectAction
-	ConnectReq    *http.Request
-	UserData      interface{}
+
+	// Proxy request, if proxy request method is CONNECT.
+	// It's using internally. Don't change in Context struct!
+	ConnectReq *http.Request
+
+	// Remote host, if proxy request method is CONNECT.
+	// It's using internally. Don't change in Context struct!
+	ConnectHost string
+
+	// User data to use free.
+	UserData interface{}
+
+	hijTLSConn   *tls.Conn
+	hijTLSReader *bufio.Reader
 }

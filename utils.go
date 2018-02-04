@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/http/httputil"
 	"regexp"
 	"strconv"
 	"strings"
@@ -49,9 +50,39 @@ func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
 	} else {
 		h.Del("Content-Length")
 	}
-	w.WriteHeader(resp.StatusCode)
-	_, err := io.Copy(w, resp.Body)
-	return err
+	h.Del("Transfer-Encoding")
+	te := ""
+	if len(resp.TransferEncoding) > 0 {
+		if len(resp.TransferEncoding) > 1 {
+			return ErrUnsupportedTransferEncoding
+		}
+		te = resp.TransferEncoding[0]
+	}
+	switch te {
+	case "":
+		w.WriteHeader(resp.StatusCode)
+		if _, err := io.Copy(w, resp.Body); err != nil {
+			return err
+		}
+	case "chunked":
+		h.Add("Transfer-Encoding", "chunked")
+		//h.Del("Content-Length")
+		h.Set("Connection", "close")
+		w.WriteHeader(resp.StatusCode)
+		w2 := httputil.NewChunkedWriter(w)
+		if _, err := io.Copy(w2, resp.Body); err != nil {
+			return err
+		}
+		if err := w2.Close(); err != nil {
+			return err
+		}
+		if _, err := w.Write([]byte("\r\n")); err != nil {
+			return err
+		}
+	default:
+		return ErrUnsupportedTransferEncoding
+	}
+	return nil
 }
 
 func ServeInMemory(w http.ResponseWriter, code int, header http.Header, body []byte) error {

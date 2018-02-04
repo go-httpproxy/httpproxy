@@ -13,6 +13,7 @@ import (
 	"time"
 )
 
+// Default certificate.
 var DefaultCaCert = []byte(`-----BEGIN CERTIFICATE-----
 MIIFkzCCA3ugAwIBAgIJAKEbW2ujNjX9MA0GCSqGSIb3DQEBCwUAMGAxCzAJBgNV
 BAYTAlRSMREwDwYDVQQIDAhJc3RhbmJ1bDEVMBMGA1UECgwMZ28taHR0cHByb3h5
@@ -46,6 +47,7 @@ Ii9Vb07WDMQXou0ZZs7rnjAKo+sfFElTFewtS1wif4ZYBUJN1ln9G8qKaxbAiElm
 MgzNfZ7WlnaJf2rfHJbvK9VqJ9z6dLRYPjCHhakJBtzsMdxysEGJ
 -----END CERTIFICATE-----`)
 
+// Default key.
 var DefaultCaKey = []byte(`-----BEGIN RSA PRIVATE KEY-----
 MIIJKQIBAAKCAgEA18cwaaZzhdDEpUXpR9pkYRqsSdT30WhynFhFtcaBOf4eYdpt
 AJWL2ipo3Ac6bh+YgWfywG4prrSfWOJl+dQ59w439vLek/waBcEeFx+wJ6PFu0ur

@@ -20,24 +20,19 @@ func doError(ctx *Context, when string, err *Error, opErr error) {
 }
 
 func doAccept(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
-	if ctx.Prx.OnAccept == nil {
-		return false
-	}
-	resp := ctx.Prx.OnAccept(ctx, r)
-	if resp == nil {
+	if ctx.Prx.OnAccept == nil || !ctx.Prx.OnAccept(ctx, w, r) {
 		return false
 	}
 	if r.Close {
 		defer r.Body.Close()
 	}
-	err := ServeResponse(w, resp)
-	if err != nil && !isConnectionClosed(err) {
-		doError(ctx, "Accept", ErrResponseWrite, err)
-	}
 	return true
 }
 
 func doAuth(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
+	if r.Method != "CONNECT" && !r.URL.IsAbs() {
+		return false
+	}
 	if ctx.Prx.OnAuth == nil {
 		return false
 	}
@@ -57,16 +52,17 @@ func doAuth(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
 	if r.Close {
 		defer r.Body.Close()
 	}
-	err := ServeInMemory(w, 407, nil, []byte("Proxy Authentication Required"))
+	err := ServeInMemory(w, 407, map[string][]string{"Proxy-Authenticate": {"Basic"}},
+		[]byte("Proxy Authentication Required"))
 	if err != nil && !isConnectionClosed(err) {
 		doError(ctx, "Auth", ErrResponseWrite, err)
 	}
 	return true
 }
 
-func doConnect(ctx *Context, w http.ResponseWriter, r *http.Request) (w2 http.ResponseWriter, r2 *http.Request) {
+func doConnect(ctx *Context, w http.ResponseWriter, r *http.Request) (w2 http.ResponseWriter) {
 	if r.Method != "CONNECT" {
-		w2, r2 = w, r
+		w2 = w
 		return
 	}
 	hij, ok := w.(http.Hijacker)
@@ -87,16 +83,22 @@ func doConnect(ctx *Context, w http.ResponseWriter, r *http.Request) (w2 http.Re
 	}
 	hijConn := conn.(*net.TCPConn)
 	ctx.ConnectAction = ConnectProxy
+	ctx.ConnectReq = r
 	host := r.URL.Host
 	if ctx.Prx.OnConnect != nil {
-		ctx.ConnectAction, host = ctx.Prx.OnConnect(ctx, host)
+		var newHost string
+		ctx.ConnectAction, newHost = ctx.Prx.OnConnect(ctx, host)
 		if ctx.ConnectAction == ConnectNone {
 			ctx.ConnectAction = ConnectProxy
+		}
+		if newHost != "" {
+			host = newHost
 		}
 	}
 	if !hasPort.MatchString(host) {
 		host += ":80"
 	}
+	ctx.ConnectHost = host
 	switch ctx.ConnectAction {
 	case ConnectProxy:
 		conn, err := net.Dial("tcp", host)
@@ -150,39 +152,41 @@ func doConnect(ctx *Context, w http.ResponseWriter, r *http.Request) (w2 http.Re
 			}
 			return
 		}
-		hijTlsConn := tls.Server(hijConn, tlsConfig)
-		if err := hijTlsConn.Handshake(); err != nil {
-			hijTlsConn.Close()
+		ctx.hijTLSConn = tls.Server(hijConn, tlsConfig)
+		if err := ctx.hijTLSConn.Handshake(); err != nil {
+			ctx.hijTLSConn.Close()
 			if !isConnectionClosed(err) {
 				doError(ctx, "Connect", ErrTLSHandshake, err)
 			}
 			return
 		}
-		hijTlsReader := bufio.NewReader(hijTlsConn)
-		req, err := http.ReadRequest(hijTlsReader)
-		if err != nil {
-			hijTlsConn.Close()
-			if !isConnectionClosed(err) {
-				doError(ctx, "Connect", ErrRequestRead, err)
-			}
-			return
-		}
-		req.RemoteAddr = r.RemoteAddr
-		if req.URL.IsAbs() {
-			hijTlsConn.Close()
-			doError(ctx, "Connect", ErrAbsURLAfterCONNECT, nil)
-			return
-		}
-		req.URL.Scheme = "https"
-		req.URL.Host = host
-		w2 = NewConnResponseWriter(hijTlsConn)
-		r2 = req
+		ctx.hijTLSReader = bufio.NewReader(ctx.hijTLSConn)
+		w2 = NewConnResponseWriter(ctx.hijTLSConn)
 		return
 	}
 	return
 }
 
-func doRequest(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
+func doMitm(ctx *Context, w http.ResponseWriter) (r *http.Request) {
+	req, err := http.ReadRequest(ctx.hijTLSReader)
+	if err != nil {
+		if !isConnectionClosed(err) {
+			doError(ctx, "Request", ErrRequestRead, err)
+		}
+		return
+	}
+	req.RemoteAddr = ctx.ConnectReq.RemoteAddr
+	if req.URL.IsAbs() {
+		doError(ctx, "Request", ErrAbsURLAfterCONNECT, nil)
+		return
+	}
+	req.URL.Scheme = "https"
+	req.URL.Host = ctx.ConnectHost
+	r = req
+	return
+}
+
+func doRequest(ctx *Context, w http.ResponseWriter, r *http.Request) (bool, error) {
 	r.RequestURI = ""
 	if !r.URL.IsAbs() {
 		if r.Close {
@@ -192,26 +196,30 @@ func doRequest(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
 		if err != nil && !isConnectionClosed(err) {
 			doError(ctx, "Request", ErrResponseWrite, err)
 		}
-		return true
+		return true, err
 	}
 	if ctx.Prx.OnRequest == nil {
-		return false
+		return false, nil
 	}
 	resp := ctx.Prx.OnRequest(ctx, r)
 	if resp == nil {
-		return false
+		return false, nil
 	}
 	if r.Close {
 		defer r.Body.Close()
+	}
+	resp.TransferEncoding = nil
+	if ctx.ConnectAction == ConnectMitm && ctx.Prx.MitmChunked {
+		resp.TransferEncoding = []string{"chunked"}
 	}
 	err := ServeResponse(w, resp)
 	if err != nil && !isConnectionClosed(err) {
 		doError(ctx, "Request", ErrResponseWrite, err)
 	}
-	return true
+	return true, err
 }
 
-func doResponse(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
+func doResponse(ctx *Context, w http.ResponseWriter, r *http.Request) (bool, error) {
 	resp, err := ctx.Prx.Rt.RoundTrip(r)
 	if err != nil {
 		if r.Close {
@@ -220,14 +228,18 @@ func doResponse(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
 		if err != context.Canceled && !isConnectionClosed(err) {
 			doError(ctx, "Response", ErrRoundTrip, err)
 		}
-		return false
+		return false, err
 	}
 	if ctx.Prx.OnResponse != nil {
 		ctx.Prx.OnResponse(ctx, r, resp)
+	}
+	resp.TransferEncoding = nil
+	if ctx.ConnectAction == ConnectMitm && ctx.Prx.MitmChunked {
+		resp.TransferEncoding = []string{"chunked"}
 	}
 	err = ServeResponse(w, resp)
 	if err != nil && !isConnectionClosed(err) {
 		doError(ctx, "Response", ErrResponseWrite, err)
 	}
-	return true
+	return true, err
 }
