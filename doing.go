@@ -88,9 +88,6 @@ func doConnect(ctx *Context, w http.ResponseWriter, r *http.Request) (w2 http.Re
 	if ctx.Prx.OnConnect != nil {
 		var newHost string
 		ctx.ConnectAction, newHost = ctx.Prx.OnConnect(ctx, host)
-		if ctx.ConnectAction == ConnectNone {
-			ctx.ConnectAction = ConnectProxy
-		}
 		if newHost != "" {
 			host = newHost
 		}
@@ -162,7 +159,8 @@ func doConnect(ctx *Context, w http.ResponseWriter, r *http.Request) (w2 http.Re
 		}
 		ctx.hijTLSReader = bufio.NewReader(ctx.hijTLSConn)
 		w2 = NewConnResponseWriter(ctx.hijTLSConn)
-		return
+	default:
+		hijConn.Close()
 	}
 	return
 }

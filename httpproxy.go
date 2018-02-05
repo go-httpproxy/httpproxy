@@ -12,7 +12,7 @@ type ConnectAction int
 // Constants of ConnectAction type.
 const (
 	// ConnectNone specifies that proxy request is not CONNECT.
-	// If it returned in OnConnect, changed to ConnectProxy.
+	// If it returned in OnConnect, proxy connection closes immediately.
 	ConnectNone = ConnectAction(iota)
 
 	// ConnectProxy specifies directly socket proxy after the CONNECT.
@@ -109,13 +109,15 @@ func (prx *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if w2 := doConnect(ctx, w, r); w2 != nil {
 		w = w2
+		r = nil
 	} else {
 		return
 	}
 
 	for {
 		var cyclic = false
-		if ctx.ConnectAction == ConnectMitm {
+		switch ctx.ConnectAction {
+		case ConnectMitm:
 			if prx.MitmChunked {
 				cyclic = true
 			}
