@@ -1,3 +1,11 @@
+/*
+Package httpproxy provides a customizable HTTP proxy;
+supports HTTP, HTTPS through CONNECT. And also provides HTTPS connection
+using "Man in the Middle" style attack.
+
+It's easy to use. `httpproxy.Proxy` implements `Handler` interface of `net/http`
+package to offer `http.ListenAndServe` function.
+*/
 package httpproxy
 
 import (
@@ -70,12 +78,12 @@ type Proxy struct {
 	MitmChunked bool
 }
 
-// NewProxy returns a new Proxy has default certificate and key.
+// NewProxy returns a new Proxy has default CA certificate and key.
 func NewProxy() (*Proxy, error) {
 	return NewProxyCert(nil, nil)
 }
 
-// NewProxyCert returns a new Proxy given certificate and key.
+// NewProxyCert returns a new Proxy given CA certificate and key.
 func NewProxyCert(caCert, caKey []byte) (result *Proxy, error error) {
 	result = &Proxy{
 		Rt: &http.Transport{TLSClientConfig: &tls.Config{},
@@ -126,7 +134,7 @@ func (prx *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if r == nil {
 			break
 		}
-		ctx.SubSessionNo += 1
+		ctx.SubSessionNo++
 		if b, err := doRequest(ctx, w, r); err != nil {
 			break
 		} else {
