@@ -1,12 +1,14 @@
-# A Go HTTP proxy library which has KISS principle
+# Go HTTP proxy library
+
+[![GoDoc](https://godoc.org/github.com/go-httpproxy/httpproxy?status.svg)](https://godoc.org/github.com/go-httpproxy/httpproxy)
 
 ## Introduction
 
 `github.com/go-httpproxy/httpproxy` repository provides an HTTP proxy library
 for Go (golang).
 
-The library is regular HTTP proxy; supports HTTP, HTTPS through CONNECT. And
-also provides HTTPS connection using "Man in the Middle" style attack.
+The library is a customizable HTTP proxy; supports HTTP, HTTPS through CONNECT.
+And also provides HTTPS connection using "Man in the Middle" style attack.
 
 It's easy to use. `httpproxy.Proxy` implements `Handler` interface of `net/http`
 package to offer `http.ListenAndServe` function.
@@ -176,11 +178,3 @@ func main() {
 	http.ListenAndServe(":8080", prx)
 }
 ```
-
-## GoDoc
-
-[https://godoc.org/github.com/go-httpproxy/httpproxy](https://godoc.org/github.com/go-httpproxy/httpproxy)
-
-## To-Do
-
-* GoDoc
