@@ -12,6 +12,7 @@ import (
 	"strings"
 )
 
+// InMemoryResponse creates new HTTP response given arguments.
 func InMemoryResponse(code int, header http.Header, body []byte) *http.Response {
 	if header == nil {
 		header = make(http.Header)
@@ -35,6 +36,7 @@ func InMemoryResponse(code int, header http.Header, body []byte) *http.Response 
 	}
 }
 
+// ServeResponse serves HTTP response to http.ResponseWriter.
 func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
 	if resp.Close {
 		defer resp.Body.Close()
@@ -85,6 +87,7 @@ func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
 	return nil
 }
 
+// ServeInMemory serves HTTP response given arguments to http.ResponseWriter.
 func ServeInMemory(w http.ResponseWriter, code int, header http.Header, body []byte) error {
 	return ServeResponse(w, InMemoryResponse(code, header, body))
 }
