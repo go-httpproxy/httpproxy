@@ -153,13 +153,13 @@ func doConnect(ctx *Context, w http.ResponseWriter, r *http.Request) (w2 http.Re
 		remoteConn.Close()
 	case ConnectMitm:
 		tlsConfig := &tls.Config{}
-		cert, err := signHosts(ctx.Prx.Ca, []string{stripPort(host)})
-		if err != nil {
+		cert := ctx.Prx.signer.SignHost(stripPort(host))
+		if cert == nil {
 			hijConn.Close()
 			doError(ctx, "Connect", ErrTLSSignHost, err)
 			return
 		}
-		tlsConfig.Certificates = append(tlsConfig.Certificates, cert)
+		tlsConfig.Certificates = append(tlsConfig.Certificates, *cert)
 		if _, err := hijConn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n")); err != nil {
 			hijConn.Close()
 			if !isConnectionClosed(err) {

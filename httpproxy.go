@@ -78,6 +78,8 @@ type Proxy struct {
 	MitmChunked bool
 
 	AuthType string
+
+	signer *CaSigner
 }
 
 // NewProxy returns a new Proxy has default CA certificate and key.
@@ -89,8 +91,11 @@ func NewProxy() (*Proxy, error) {
 func NewProxyCert(caCert, caKey []byte) (result *Proxy, error error) {
 	result = &Proxy{
 		Rt: &http.Transport{TLSClientConfig: &tls.Config{},
-			Proxy: http.ProxyFromEnvironment}, MitmChunked: true,
+			Proxy: http.ProxyFromEnvironment},
+		MitmChunked: true,
+		signer:      NewCaSignerCache(1024),
 	}
+	result.signer.Ca = &result.Ca
 	if caCert == nil {
 		caCert = DefaultCaCert
 	}
