@@ -36,24 +36,40 @@ func doAuth(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
 	if ctx.Prx.OnAuth == nil {
 		return false
 	}
-	authparts := strings.SplitN(r.Header.Get("Proxy-Authorization"), " ", 2)
-	if len(authparts) >= 2 {
-		switch authparts[0] {
-		case "Basic":
-			userpassraw, err := base64.StdEncoding.DecodeString(authparts[1])
-			if err == nil {
-				userpass := strings.SplitN(string(userpassraw), ":", 2)
-				if len(userpass) >= 2 && ctx.Prx.OnAuth(ctx, userpass[0], userpass[1]) {
-					return false
+	prxAuthType := ctx.Prx.AuthType
+	if prxAuthType == "" {
+		prxAuthType = "Basic"
+	}
+	unauthorized := false
+	authParts := strings.SplitN(r.Header.Get("Proxy-Authorization"), " ", 2)
+	if len(authParts) >= 2 {
+		authType := authParts[0]
+		authData := authParts[1]
+		if prxAuthType == authType {
+			switch authType {
+			case "Basic":
+				userpassraw, err := base64.StdEncoding.DecodeString(authData)
+				if err == nil {
+					userpass := strings.SplitN(string(userpassraw), ":", 2)
+					if len(userpass) >= 2 && ctx.Prx.OnAuth(ctx, userpass[0], userpass[1]) {
+						return false
+					}
 				}
 			}
 		}
+		unauthorized = true
 	}
 	if r.Close {
 		defer r.Body.Close()
 	}
-	err := ServeInMemory(w, 407, map[string][]string{"Proxy-Authenticate": {"Basic"}},
-		[]byte("Proxy Authentication Required"))
+	respCode := 407
+	respBody := "Proxy Authentication Required"
+	if unauthorized {
+		respCode = 401
+		respBody = "Unauthorized"
+	}
+	err := ServeInMemory(w, respCode, map[string][]string{"Proxy-Authenticate": {prxAuthType}},
+		[]byte(respBody))
 	if err != nil && !isConnectionClosed(err) {
 		doError(ctx, "Auth", ErrResponseWrite, err)
 	}

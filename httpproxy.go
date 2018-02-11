@@ -76,6 +76,8 @@ type Proxy struct {
 	// If ConnectAction is ConnectMitm, it sets chunked to Transfer-Encoding.
 	// By default, it is true.
 	MitmChunked bool
+
+	AuthType string
 }
 
 // NewProxy returns a new Proxy has default CA certificate and key.
