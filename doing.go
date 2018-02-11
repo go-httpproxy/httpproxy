@@ -46,6 +46,7 @@ func doAuth(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
 		authType := authParts[0]
 		authData := authParts[1]
 		if prxAuthType == authType {
+			unauthorized = true
 			switch authType {
 			case "Basic":
 				userpassraw, err := base64.StdEncoding.DecodeString(authData)
@@ -55,9 +56,10 @@ func doAuth(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
 						return false
 					}
 				}
+			default:
+				unauthorized = false
 			}
 		}
-		unauthorized = true
 	}
 	if r.Close {
 		defer r.Body.Close()
@@ -233,7 +235,7 @@ func doRequest(ctx *Context, w http.ResponseWriter, r *http.Request) (bool, erro
 	return true, err
 }
 
-func doResponse(ctx *Context, w http.ResponseWriter, r *http.Request) (bool, error) {
+func doResponse(ctx *Context, w http.ResponseWriter, r *http.Request) error {
 	resp, err := ctx.Prx.Rt.RoundTrip(r)
 	if err != nil {
 		if r.Close {
@@ -242,7 +244,11 @@ func doResponse(ctx *Context, w http.ResponseWriter, r *http.Request) (bool, err
 		if err != context.Canceled && !isConnectionClosed(err) {
 			doError(ctx, "Response", ErrRoundTrip, err)
 		}
-		return false, err
+		err := ServeInMemory(w, 502, nil, []byte("Bad Gateway"))
+		if err != nil && !isConnectionClosed(err) {
+			doError(ctx, "Response", ErrResponseWrite, err)
+		}
+		return err
 	}
 	if ctx.Prx.OnResponse != nil {
 		ctx.Prx.OnResponse(ctx, r, resp)
@@ -255,5 +261,5 @@ func doResponse(ctx *Context, w http.ResponseWriter, r *http.Request) (bool, err
 	if err != nil && !isConnectionClosed(err) {
 		doError(ctx, "Response", ErrResponseWrite, err)
 	}
-	return true, err
+	return err
 }

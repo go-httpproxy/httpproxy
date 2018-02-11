@@ -150,7 +150,7 @@ func (prx *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		if b, err := doResponse(ctx, w, r); err != nil || !b || !cyclic {
+		if err := doResponse(ctx, w, r); err != nil || !cyclic {
 			break
 		}
 	}
