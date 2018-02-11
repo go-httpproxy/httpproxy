@@ -118,8 +118,10 @@ func (prx *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	removeProxyHeaders(r)
 
 	if w2 := doConnect(ctx, w, r); w2 != nil {
-		w = w2
-		r = nil
+		if w != w2 {
+			w = w2
+			r = nil
+		}
 	} else {
 		return
 	}
