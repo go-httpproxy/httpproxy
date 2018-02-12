@@ -90,25 +90,26 @@ func NewProxy() (*Proxy, error) {
 }
 
 // NewProxyCert returns a new Proxy given CA certificate and key.
-func NewProxyCert(caCert, caKey []byte) (result *Proxy, error error) {
-	result = &Proxy{
+func NewProxyCert(caCert, caKey []byte) (*Proxy, error) {
+	prx := &Proxy{
 		Rt: &http.Transport{TLSClientConfig: &tls.Config{},
 			Proxy: http.ProxyFromEnvironment},
 		MitmChunked: true,
 		signer:      NewCaSignerCache(1024),
 	}
-	result.signer.Ca = &result.Ca
+	prx.signer.Ca = &prx.Ca
 	if caCert == nil {
 		caCert = DefaultCaCert
 	}
 	if caKey == nil {
 		caKey = DefaultCaKey
 	}
-	result.Ca, error = tls.X509KeyPair(caCert, caKey)
-	if error != nil {
-		return
+	var err error
+	prx.Ca, err = tls.X509KeyPair(caCert, caKey)
+	if err != nil {
+		return nil, err
 	}
-	return
+	return prx, nil
 }
 
 // ServeHTTP implements http.Handler.
