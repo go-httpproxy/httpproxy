@@ -2,23 +2,12 @@
 
 [![GoDoc](https://godoc.org/github.com/go-httpproxy/httpproxy?status.svg)](https://godoc.org/github.com/go-httpproxy/httpproxy)
 
-## Introduction
-
-`github.com/go-httpproxy/httpproxy` repository provides an HTTP proxy library
-for Go (golang).
-
-The library is a customizable HTTP proxy; supports HTTP, HTTPS through CONNECT.
-And also provides HTTPS connection using "Man in the Middle" style attack.
+Package httpproxy provides a customizable HTTP proxy; supports HTTP, HTTPS through
+CONNECT. And also provides HTTPS connection using "Man in the Middle" style
+attack.
 
 It's easy to use. `httpproxy.Proxy` implements `Handler` interface of `net/http`
 package to offer `http.ListenAndServe` function.
-
-### Keep it simple, stupid!
-
-> KISS is an acronym for "Keep it simple, stupid" as a design principle. The
-KISS principle states that most systems work best if they are kept simple rather
-than made complicated; therefore simplicity should be a key goal in design and
-unnecessary complexity should be avoided.  [Wikipedia]
 
 ## Usage
 
@@ -29,7 +18,7 @@ Library has two significant structs: Proxy and Context.
 ```go
 // Proxy defines parameters for running an HTTP Proxy. It implements
 // http.Handler interface for ListenAndServe function. If you need, you must
-// fill Proxy struct before handling requests.
+// set Proxy struct before handling requests.
 type Proxy struct {
 	// Session number of last proxy request.
 	SessionNo int64
@@ -70,8 +59,12 @@ type Proxy struct {
 	OnResponse func(ctx *Context, req *http.Request, resp *http.Response)
 
 	// If ConnectAction is ConnectMitm, it sets chunked to Transfer-Encoding.
-	// By default, it is true.
+	// By default, true.
 	MitmChunked bool
+
+	// HTTP Authentication type. If it's not specified (""), uses "Basic".
+	// By default, "".
+	AuthType string
 }
 ```
 
