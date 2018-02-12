@@ -10,8 +10,10 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 )
 
+// InMemoryResponse creates new HTTP response given arguments.
 func InMemoryResponse(code int, header http.Header, body []byte) *http.Response {
 	if header == nil {
 		header = make(http.Header)
@@ -35,6 +37,7 @@ func InMemoryResponse(code int, header http.Header, body []byte) *http.Response 
 	}
 }
 
+// ServeResponse serves HTTP response to http.ResponseWriter.
 func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
 	if resp.Close {
 		defer resp.Body.Close()
@@ -44,6 +47,13 @@ func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
 		for _, v1 := range v {
 			h.Add(k, v1)
 		}
+	}
+	if h.Get("Date") == "" {
+		//h.Set("Date", time.Now().UTC().Format(time.RFC1123))
+		h.Set("Date", time.Now().UTC().Format("Mon, 2 Jan 2006 15:04:05")+" GMT")
+	}
+	if h.Get("Content-Type") == "" {
+		h.Set("Content-Type", "text/plain; charset=utf-8")
 	}
 	if resp.ContentLength >= 0 {
 		h.Set("Content-Length", strconv.FormatInt(resp.ContentLength, 10))
@@ -85,6 +95,7 @@ func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
 	return nil
 }
 
+// ServeInMemory serves HTTP response given arguments to http.ResponseWriter.
 func ServeInMemory(w http.ResponseWriter, code int, header http.Header, body []byte) error {
 	return ServeResponse(w, InMemoryResponse(code, header, body))
 }

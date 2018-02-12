@@ -10,10 +10,11 @@ import (
 	mrand "math/rand"
 	"net"
 	"sort"
+	"sync"
 	"time"
 )
 
-// Default certificate.
+// DefaultCaCert provides default CA certificate.
 var DefaultCaCert = []byte(`-----BEGIN CERTIFICATE-----
 MIIFkzCCA3ugAwIBAgIJAKEbW2ujNjX9MA0GCSqGSIb3DQEBCwUAMGAxCzAJBgNV
 BAYTAlRSMREwDwYDVQQIDAhJc3RhbmJ1bDEVMBMGA1UECgwMZ28taHR0cHByb3h5
@@ -47,7 +48,7 @@ Ii9Vb07WDMQXou0ZZs7rnjAKo+sfFElTFewtS1wif4ZYBUJN1ln9G8qKaxbAiElm
 MgzNfZ7WlnaJf2rfHJbvK9VqJ9z6dLRYPjCHhakJBtzsMdxysEGJ
 -----END CERTIFICATE-----`)
 
-// Default key.
+// DefaultCaKey provides default CA key.
 var DefaultCaKey = []byte(`-----BEGIN RSA PRIVATE KEY-----
 MIIJKQIBAAKCAgEA18cwaaZzhdDEpUXpR9pkYRqsSdT30WhynFhFtcaBOf4eYdpt
 AJWL2ipo3Ac6bh+YgWfywG4prrSfWOJl+dQ59w439vLek/waBcEeFx+wJ6PFu0ur
@@ -100,7 +101,82 @@ s39uFDUnxsMb2Nl3JcNJHYBTm9ubjAZSo/3NuB0z/Gm+ssOcExTD//vW7BxxSAcs
 /xlPPTPbY5qoMAT7kK71kd4Ypnqbcs3UPpAHtcPkjWpuWOlebK0J7UYToj4f
 -----END RSA PRIVATE KEY-----`)
 
-func signHosts(ca tls.Certificate, hosts []string) (cert tls.Certificate, error error) {
+// CaSigner is a certificate signer by CA certificate. It supports caching.
+type CaSigner struct {
+	// Ca specifies CA certificate. You must set before using.
+	Ca *tls.Certificate
+
+	mu        sync.RWMutex
+	certMap   map[string]*tls.Certificate
+	certList  []string
+	certIndex int
+	certMax   int
+}
+
+// NewCaSigner returns a new CaSigner without caching.
+func NewCaSigner() *CaSigner {
+	return NewCaSignerCache(0)
+}
+
+// NewCaSignerCache returns a new CaSigner with caching given max.
+func NewCaSignerCache(max int) *CaSigner {
+	if max < 0 {
+		max = 0
+	}
+	return &CaSigner{
+		certMap:   make(map[string]*tls.Certificate),
+		certList:  make([]string, max),
+		certIndex: 0,
+		certMax:   max,
+	}
+}
+
+// SignHost generates TLS certificate given single host, signed by CA certificate.
+func (c *CaSigner) SignHost(host string) (cert *tls.Certificate) {
+	if host == "" {
+		return
+	}
+	if c.certMax <= 0 {
+		crt, err := SignHosts(*c.Ca, []string{host})
+		if err != nil {
+			return nil
+		}
+		cert = crt
+		return
+	}
+	func() {
+		c.mu.RLock()
+		defer c.mu.RUnlock()
+		cert = c.certMap[host]
+	}()
+	if cert != nil {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	cert = c.certMap[host]
+	if cert != nil {
+		return
+	}
+	crt, err := SignHosts(*c.Ca, []string{host})
+	if err != nil {
+		return nil
+	}
+	cert = crt
+	if len(c.certMap) >= c.certMax {
+		delete(c.certMap, c.certList[c.certIndex])
+	}
+	c.certMap[host] = cert
+	c.certList[c.certIndex] = host
+	c.certIndex++
+	if c.certIndex >= c.certMax {
+		c.certIndex = 0
+	}
+	return
+}
+
+// SignHosts generates TLS certificate given hosts, signed by CA certificate.
+func SignHosts(ca tls.Certificate, hosts []string) (cert *tls.Certificate, error error) {
 	var x509ca *x509.Certificate
 	if x509ca, error = x509.ParseCertificate(ca.Certificate[0]); error != nil {
 		return
@@ -136,7 +212,7 @@ func signHosts(ca tls.Certificate, hosts []string) (cert tls.Certificate, error 
 	if derBytes, error = x509.CreateCertificate(rnd, &template, x509ca, &certPriv.PublicKey, ca.PrivateKey); error != nil {
 		return
 	}
-	return tls.Certificate{
+	return &tls.Certificate{
 		Certificate: [][]byte{derBytes, ca.Certificate[0]},
 		PrivateKey:  certPriv,
 	}, nil

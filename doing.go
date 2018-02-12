@@ -36,24 +36,42 @@ func doAuth(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
 	if ctx.Prx.OnAuth == nil {
 		return false
 	}
-	authparts := strings.SplitN(r.Header.Get("Proxy-Authorization"), " ", 2)
-	if len(authparts) >= 2 {
-		switch authparts[0] {
-		case "Basic":
-			userpassraw, err := base64.StdEncoding.DecodeString(authparts[1])
-			if err == nil {
-				userpass := strings.SplitN(string(userpassraw), ":", 2)
-				if len(userpass) >= 2 && ctx.Prx.OnAuth(ctx, userpass[0], userpass[1]) {
-					return false
+	prxAuthType := ctx.Prx.AuthType
+	if prxAuthType == "" {
+		prxAuthType = "Basic"
+	}
+	unauthorized := false
+	authParts := strings.SplitN(r.Header.Get("Proxy-Authorization"), " ", 2)
+	if len(authParts) >= 2 {
+		authType := authParts[0]
+		authData := authParts[1]
+		if prxAuthType == authType {
+			unauthorized = true
+			switch authType {
+			case "Basic":
+				userpassraw, err := base64.StdEncoding.DecodeString(authData)
+				if err == nil {
+					userpass := strings.SplitN(string(userpassraw), ":", 2)
+					if len(userpass) >= 2 && ctx.Prx.OnAuth(ctx, userpass[0], userpass[1]) {
+						return false
+					}
 				}
+			default:
+				unauthorized = false
 			}
 		}
 	}
 	if r.Close {
 		defer r.Body.Close()
 	}
-	err := ServeInMemory(w, 407, map[string][]string{"Proxy-Authenticate": {"Basic"}},
-		[]byte("Proxy Authentication Required"))
+	respCode := 407
+	respBody := "Proxy Authentication Required"
+	if unauthorized {
+		respCode = 401
+		respBody = "Unauthorized"
+	}
+	err := ServeInMemory(w, respCode, map[string][]string{"Proxy-Authenticate": {prxAuthType}},
+		[]byte(respBody))
 	if err != nil && !isConnectionClosed(err) {
 		doError(ctx, "Auth", ErrResponseWrite, err)
 	}
@@ -88,9 +106,6 @@ func doConnect(ctx *Context, w http.ResponseWriter, r *http.Request) (w2 http.Re
 	if ctx.Prx.OnConnect != nil {
 		var newHost string
 		ctx.ConnectAction, newHost = ctx.Prx.OnConnect(ctx, host)
-		if ctx.ConnectAction == ConnectNone {
-			ctx.ConnectAction = ConnectProxy
-		}
 		if newHost != "" {
 			host = newHost
 		}
@@ -138,13 +153,13 @@ func doConnect(ctx *Context, w http.ResponseWriter, r *http.Request) (w2 http.Re
 		remoteConn.Close()
 	case ConnectMitm:
 		tlsConfig := &tls.Config{}
-		cert, err := signHosts(ctx.Prx.Ca, []string{stripPort(host)})
-		if err != nil {
+		cert := ctx.Prx.signer.SignHost(stripPort(host))
+		if cert == nil {
 			hijConn.Close()
 			doError(ctx, "Connect", ErrTLSSignHost, err)
 			return
 		}
-		tlsConfig.Certificates = append(tlsConfig.Certificates, cert)
+		tlsConfig.Certificates = append(tlsConfig.Certificates, *cert)
 		if _, err := hijConn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n")); err != nil {
 			hijConn.Close()
 			if !isConnectionClosed(err) {
@@ -162,7 +177,8 @@ func doConnect(ctx *Context, w http.ResponseWriter, r *http.Request) (w2 http.Re
 		}
 		ctx.hijTLSReader = bufio.NewReader(ctx.hijTLSConn)
 		w2 = NewConnResponseWriter(ctx.hijTLSConn)
-		return
+	default:
+		hijConn.Close()
 	}
 	return
 }
@@ -219,7 +235,7 @@ func doRequest(ctx *Context, w http.ResponseWriter, r *http.Request) (bool, erro
 	return true, err
 }
 
-func doResponse(ctx *Context, w http.ResponseWriter, r *http.Request) (bool, error) {
+func doResponse(ctx *Context, w http.ResponseWriter, r *http.Request) error {
 	resp, err := ctx.Prx.Rt.RoundTrip(r)
 	if err != nil {
 		if r.Close {
@@ -228,7 +244,11 @@ func doResponse(ctx *Context, w http.ResponseWriter, r *http.Request) (bool, err
 		if err != context.Canceled && !isConnectionClosed(err) {
 			doError(ctx, "Response", ErrRoundTrip, err)
 		}
-		return false, err
+		err := ServeInMemory(w, 502, nil, []byte("Bad Gateway"))
+		if err != nil && !isConnectionClosed(err) {
+			doError(ctx, "Response", ErrResponseWrite, err)
+		}
+		return err
 	}
 	if ctx.Prx.OnResponse != nil {
 		ctx.Prx.OnResponse(ctx, r, resp)
@@ -241,5 +261,5 @@ func doResponse(ctx *Context, w http.ResponseWriter, r *http.Request) (bool, err
 	if err != nil && !isConnectionClosed(err) {
 		doError(ctx, "Response", ErrResponseWrite, err)
 	}
-	return true, err
+	return err
 }

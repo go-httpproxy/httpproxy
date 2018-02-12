@@ -1,3 +1,11 @@
+/*
+Package httpproxy provides a customizable HTTP proxy;
+supports HTTP, HTTPS through CONNECT. And also provides HTTPS connection
+using "Man in the Middle" style attack.
+
+It's easy to use. `httpproxy.Proxy` implements `Handler` interface of `net/http`
+package to offer `http.ListenAndServe` function.
+*/
 package httpproxy
 
 import (
@@ -12,7 +20,7 @@ type ConnectAction int
 // Constants of ConnectAction type.
 const (
 	// ConnectNone specifies that proxy request is not CONNECT.
-	// If it returned in OnConnect, changed to ConnectProxy.
+	// If it returned in OnConnect, proxy connection closes immediately.
 	ConnectNone = ConnectAction(iota)
 
 	// ConnectProxy specifies directly socket proxy after the CONNECT.
@@ -25,7 +33,7 @@ const (
 
 // Proxy defines parameters for running an HTTP Proxy. It implements
 // http.Handler interface for ListenAndServe function. If you need, you must
-// fill Proxy struct before handling requests.
+// set Proxy struct before handling requests.
 type Proxy struct {
 	// Session number of last proxy request.
 	SessionNo int64
@@ -66,21 +74,30 @@ type Proxy struct {
 	OnResponse func(ctx *Context, req *http.Request, resp *http.Response)
 
 	// If ConnectAction is ConnectMitm, it sets chunked to Transfer-Encoding.
-	// By default, it is true.
+	// By default, true.
 	MitmChunked bool
+
+	// HTTP Authentication type. If it's not specified (""), uses "Basic".
+	// By default, "".
+	AuthType string
+
+	signer *CaSigner
 }
 
-// NewProxy returns a new Proxy has default certificate and key.
+// NewProxy returns a new Proxy has default CA certificate and key.
 func NewProxy() (*Proxy, error) {
 	return NewProxyCert(nil, nil)
 }
 
-// NewProxyCert returns a new Proxy given certificate and key.
+// NewProxyCert returns a new Proxy given CA certificate and key.
 func NewProxyCert(caCert, caKey []byte) (result *Proxy, error error) {
 	result = &Proxy{
 		Rt: &http.Transport{TLSClientConfig: &tls.Config{},
-			Proxy: http.ProxyFromEnvironment}, MitmChunked: true,
+			Proxy: http.ProxyFromEnvironment},
+		MitmChunked: true,
+		signer:      NewCaSignerCache(1024),
 	}
+	result.signer.Ca = &result.Ca
 	if caCert == nil {
 		caCert = DefaultCaCert
 	}
@@ -108,14 +125,18 @@ func (prx *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	removeProxyHeaders(r)
 
 	if w2 := doConnect(ctx, w, r); w2 != nil {
-		w = w2
+		if w != w2 {
+			w = w2
+			r = nil
+		}
 	} else {
 		return
 	}
 
 	for {
 		var cyclic = false
-		if ctx.ConnectAction == ConnectMitm {
+		switch ctx.ConnectAction {
+		case ConnectMitm:
 			if prx.MitmChunked {
 				cyclic = true
 			}
@@ -124,7 +145,7 @@ func (prx *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if r == nil {
 			break
 		}
-		ctx.SubSessionNo += 1
+		ctx.SubSessionNo++
 		if b, err := doRequest(ctx, w, r); err != nil {
 			break
 		} else {
@@ -136,7 +157,7 @@ func (prx *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		if b, err := doResponse(ctx, w, r); err != nil || !b || !cyclic {
+		if err := doResponse(ctx, w, r); err != nil || !cyclic {
 			break
 		}
 	}
