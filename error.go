@@ -9,6 +9,7 @@ import (
 
 // Library specific errors.
 var (
+	ErrPanic                       = NewError("panic")
 	ErrResponseWrite               = NewError("response write")
 	ErrRequestRead                 = NewError("request read")
 	ErrRemoteConnect               = NewError("remote connect")

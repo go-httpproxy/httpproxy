@@ -115,6 +115,16 @@ func NewProxyCert(caCert, caKey []byte) (result *Proxy, error error) {
 func (prx *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx := &Context{Prx: prx, SessionNo: atomic.AddInt64(&prx.SessionNo, 1)}
 
+	defer func() {
+		rec := recover()
+		if rec != nil {
+			if err, ok := rec.(error); ok && prx.OnError != nil {
+				prx.OnError(ctx, "Serve", ErrPanic, err)
+			}
+			panic(rec)
+		}
+	}()
+
 	if doAccept(ctx, w, r) {
 		return
 	}
