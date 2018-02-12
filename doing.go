@@ -66,7 +66,7 @@ func doAuth(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
 	}
 	respCode := 407
 	respBody := "Proxy Authentication Required"
-	if unauthorized {
+	if unauthorized && false {
 		respCode = 401
 		respBody = "Unauthorized"
 	}
