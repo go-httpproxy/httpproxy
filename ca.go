@@ -176,10 +176,10 @@ func (c *CaSigner) SignHost(host string) (cert *tls.Certificate) {
 }
 
 // SignHosts generates TLS certificate given hosts, signed by CA certificate.
-func SignHosts(ca tls.Certificate, hosts []string) (cert *tls.Certificate, error error) {
-	var x509ca *x509.Certificate
-	if x509ca, error = x509.ParseCertificate(ca.Certificate[0]); error != nil {
-		return
+func SignHosts(ca tls.Certificate, hosts []string) (*tls.Certificate, error) {
+	x509ca, err := x509.ParseCertificate(ca.Certificate[0])
+	if err != nil {
+		return nil, err
 	}
 	start := time.Unix(0, 0)
 	end, _ := time.Parse("2006-01-02", "2038-01-19")
@@ -201,16 +201,14 @@ func SignHosts(ca tls.Certificate, hosts []string) (cert *tls.Certificate, error
 			template.DNSNames = append(template.DNSNames, h)
 		}
 	}
-
 	rnd := mrand.New(mrand.NewSource(serial.Int64()))
-
-	var certPriv *rsa.PrivateKey
-	if certPriv, error = rsa.GenerateKey(rnd, 1024); error != nil {
-		return
+	certPriv, err := rsa.GenerateKey(rnd, 1024)
+	if err != nil {
+		return nil, err
 	}
-	var derBytes []byte
-	if derBytes, error = x509.CreateCertificate(rnd, &template, x509ca, &certPriv.PublicKey, ca.PrivateKey); error != nil {
-		return
+	derBytes, err := x509.CreateCertificate(rnd, &template, x509ca, &certPriv.PublicKey, ca.PrivateKey)
+	if err != nil {
+		return nil, err
 	}
 	return &tls.Certificate{
 		Certificate: [][]byte{derBytes, ca.Certificate[0]},
