@@ -33,7 +33,7 @@ const (
 
 // Proxy defines parameters for running an HTTP Proxy. It implements
 // http.Handler interface for ListenAndServe function. If you need, you must
-// fill Proxy struct before handling requests.
+// set Proxy struct before handling requests.
 type Proxy struct {
 	// Session number of last proxy request.
 	SessionNo int64
@@ -74,9 +74,11 @@ type Proxy struct {
 	OnResponse func(ctx *Context, req *http.Request, resp *http.Response)
 
 	// If ConnectAction is ConnectMitm, it sets chunked to Transfer-Encoding.
-	// By default, it is true.
+	// By default, true.
 	MitmChunked bool
 
+	// HTTP Authentication type. If it's not specified (""), uses "Basic".
+	// By default, "".
 	AuthType string
 
 	signer *CaSigner

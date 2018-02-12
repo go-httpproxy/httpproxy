@@ -101,8 +101,11 @@ s39uFDUnxsMb2Nl3JcNJHYBTm9ubjAZSo/3NuB0z/Gm+ssOcExTD//vW7BxxSAcs
 /xlPPTPbY5qoMAT7kK71kd4Ypnqbcs3UPpAHtcPkjWpuWOlebK0J7UYToj4f
 -----END RSA PRIVATE KEY-----`)
 
+// CaSigner is a certificate signer by CA certificate. It supports caching.
 type CaSigner struct {
-	Ca        *tls.Certificate
+	// Ca specifies CA certificate. You must set before using.
+	Ca *tls.Certificate
+
 	mu        sync.RWMutex
 	certMap   map[string]*tls.Certificate
 	certList  []string
@@ -110,10 +113,12 @@ type CaSigner struct {
 	certMax   int
 }
 
+// NewCaSigner returns a new CaSigner without caching.
 func NewCaSigner() *CaSigner {
 	return NewCaSignerCache(0)
 }
 
+// NewCaSignerCache returns a new CaSigner with caching given max.
 func NewCaSignerCache(max int) *CaSigner {
 	if max < 0 {
 		max = 0
@@ -126,16 +131,17 @@ func NewCaSignerCache(max int) *CaSigner {
 	}
 }
 
+// SignHost generates TLS certificate given single host, signed by CA certificate.
 func (c *CaSigner) SignHost(host string) (cert *tls.Certificate) {
 	if host == "" {
 		return
 	}
 	if c.certMax <= 0 {
-		crt, err := signHosts(*c.Ca, []string{host})
+		crt, err := SignHosts(*c.Ca, []string{host})
 		if err != nil {
 			return nil
 		}
-		cert = &crt
+		cert = crt
 		return
 	}
 	func() {
@@ -152,11 +158,11 @@ func (c *CaSigner) SignHost(host string) (cert *tls.Certificate) {
 	if cert != nil {
 		return
 	}
-	crt, err := signHosts(*c.Ca, []string{host})
+	crt, err := SignHosts(*c.Ca, []string{host})
 	if err != nil {
 		return nil
 	}
-	cert = &crt
+	cert = crt
 	if len(c.certMap) >= c.certMax {
 		delete(c.certMap, c.certList[c.certIndex])
 	}
@@ -169,7 +175,8 @@ func (c *CaSigner) SignHost(host string) (cert *tls.Certificate) {
 	return
 }
 
-func signHosts(ca tls.Certificate, hosts []string) (cert tls.Certificate, error error) {
+// SignHosts generates TLS certificate given hosts, signed by CA certificate.
+func SignHosts(ca tls.Certificate, hosts []string) (cert *tls.Certificate, error error) {
 	var x509ca *x509.Certificate
 	if x509ca, error = x509.ParseCertificate(ca.Certificate[0]); error != nil {
 		return
@@ -205,7 +212,7 @@ func signHosts(ca tls.Certificate, hosts []string) (cert tls.Certificate, error 
 	if derBytes, error = x509.CreateCertificate(rnd, &template, x509ca, &certPriv.PublicKey, ca.PrivateKey); error != nil {
 		return
 	}
-	return tls.Certificate{
+	return &tls.Certificate{
 		Certificate: [][]byte{derBytes, ca.Certificate[0]},
 		PrivateKey:  certPriv,
 	}, nil
