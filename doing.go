@@ -91,7 +91,8 @@ func doConnect(ctx *Context, w http.ResponseWriter, r *http.Request) (w2 http.Re
 		doError(ctx, "Connect", ErrNotSupportHijacking, err)
 		return
 	}
-	hijConn := conn.(*net.TCPConn)
+	//hijConn := conn.(*net.TCPConn)
+	hijConn := conn
 	ctx.ConnectAction = ConnectProxy
 	ctx.ConnectReq = r
 	host := r.URL.Host
