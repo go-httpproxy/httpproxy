@@ -39,9 +39,7 @@ func InMemoryResponse(code int, header http.Header, body []byte) *http.Response 
 
 // ServeResponse serves HTTP response to http.ResponseWriter.
 func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
-	if resp.Close {
-		defer resp.Body.Close()
-	}
+	defer resp.Body.Close()
 	h := w.Header()
 	for k, v := range resp.Header {
 		for _, v1 := range v {
