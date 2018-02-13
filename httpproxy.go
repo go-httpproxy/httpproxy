@@ -95,7 +95,7 @@ func NewProxyCert(caCert, caKey []byte) (*Proxy, error) {
 		Rt: &http.Transport{TLSClientConfig: &tls.Config{},
 			Proxy: http.ProxyFromEnvironment},
 		MitmChunked: true,
-		signer:      NewCaSignerCache(0),
+		signer:      NewCaSignerCache(1024),
 	}
 	prx.signer.Ca = &prx.Ca
 	if caCert == nil {

@@ -36,18 +36,21 @@ func (e *Error) Error() string {
 	return e.ErrString
 }
 
-func isConnectionClosed(error error) bool {
-	if error == nil {
+func isConnectionClosed(err error) bool {
+	if err == nil {
 		return false
 	}
-	if error == io.EOF {
+	if err == io.EOF {
 		return true
 	}
-	if err, ok := error.(*net.OpError); ok {
-		if err, ok := err.Err.(*os.SyscallError); ok && (err.Err == syscall.EPIPE || err.Err == syscall.ECONNRESET ||
-			err.Err == syscall.EPROTOTYPE) {
-			return true
+	var newerr = err
+	for opError, ok := newerr.(*net.OpError); ok; {
+		if syscallError, ok := opError.Err.(*os.SyscallError); ok {
+			if syscallError.Err == syscall.EPIPE || syscallError.Err == syscall.ECONNRESET || syscallError.Err == syscall.EPROTOTYPE {
+				return true
+			}
 		}
+		newerr = opError.Err
 	}
 	return false
 }
