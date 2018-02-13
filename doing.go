@@ -23,7 +23,9 @@ func doAccept(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
 	if ctx.Prx.OnAccept == nil || !ctx.Prx.OnAccept(ctx, w, r) {
 		return false
 	}
-	defer r.Body.Close()
+	if r.Body != nil {
+		defer r.Body.Close()
+	}
 	return true
 }
 
@@ -59,7 +61,9 @@ func doAuth(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
 			}
 		}
 	}
-	defer r.Body.Close()
+	if r.Body != nil {
+		defer r.Body.Close()
+	}
 	respCode := 407
 	respBody := "Proxy Authentication Required"
 	if unauthorized && false {
@@ -81,13 +85,17 @@ func doConnect(ctx *Context, w http.ResponseWriter, r *http.Request) (w2 http.Re
 	}
 	hij, ok := w.(http.Hijacker)
 	if !ok {
-		defer r.Body.Close()
+		if r.Body != nil {
+			defer r.Body.Close()
+		}
 		doError(ctx, "Connect", ErrNotSupportHijacking, nil)
 		return
 	}
 	conn, _, err := hij.Hijack()
 	if err != nil {
-		defer r.Body.Close()
+		if r.Body != nil {
+			defer r.Body.Close()
+		}
 		doError(ctx, "Connect", ErrNotSupportHijacking, err)
 		return
 	}
@@ -198,7 +206,9 @@ func doMitm(ctx *Context, w http.ResponseWriter) (r *http.Request) {
 func doRequest(ctx *Context, w http.ResponseWriter, r *http.Request) (bool, error) {
 	r.RequestURI = ""
 	if !r.URL.IsAbs() {
-		defer r.Body.Close()
+		if r.Body != nil {
+			defer r.Body.Close()
+		}
 		err := ServeInMemory(w, 500, nil, []byte("This is a proxy server. Does not respond to non-proxy requests."))
 		if err != nil && !isConnectionClosed(err) {
 			doError(ctx, "Request", ErrResponseWrite, err)
@@ -212,7 +222,9 @@ func doRequest(ctx *Context, w http.ResponseWriter, r *http.Request) (bool, erro
 	if resp == nil {
 		return false, nil
 	}
-	defer r.Body.Close()
+	if r.Body != nil {
+		defer r.Body.Close()
+	}
 	resp.TransferEncoding = nil
 	if ctx.ConnectAction == ConnectMitm && ctx.Prx.MitmChunked {
 		resp.TransferEncoding = []string{"chunked"}
@@ -227,7 +239,9 @@ func doRequest(ctx *Context, w http.ResponseWriter, r *http.Request) (bool, erro
 func doResponse(ctx *Context, w http.ResponseWriter, r *http.Request) error {
 	resp, err := ctx.Prx.Rt.RoundTrip(r)
 	if err != nil {
-		defer r.Body.Close()
+		if r.Body != nil {
+			defer r.Body.Close()
+		}
 		if err != context.Canceled && !isConnectionClosed(err) {
 			doError(ctx, "Response", ErrRoundTrip, err)
 		}

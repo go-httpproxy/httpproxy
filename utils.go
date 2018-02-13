@@ -39,7 +39,9 @@ func InMemoryResponse(code int, header http.Header, body []byte) *http.Response 
 
 // ServeResponse serves HTTP response to http.ResponseWriter.
 func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
-	defer resp.Body.Close()
+	if resp.Body != nil {
+		defer resp.Body.Close()
+	}
 	h := w.Header()
 	for k, v := range resp.Header {
 		for _, v1 := range v {
@@ -69,8 +71,10 @@ func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
 	switch te {
 	case "":
 		w.WriteHeader(resp.StatusCode)
-		if _, err := io.Copy(w, resp.Body); err != nil {
-			return err
+		if resp.Body != nil {
+			if _, err := io.Copy(w, resp.Body); err != nil {
+				return err
+			}
 		}
 	case "chunked":
 		h.Add("Transfer-Encoding", "chunked")
@@ -78,8 +82,10 @@ func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
 		h.Set("Connection", "close")
 		w.WriteHeader(resp.StatusCode)
 		w2 := httputil.NewChunkedWriter(w)
-		if _, err := io.Copy(w2, resp.Body); err != nil {
-			return err
+		if resp.Body != nil {
+			if _, err := io.Copy(w2, resp.Body); err != nil {
+				return err
+			}
 		}
 		if err := w2.Close(); err != nil {
 			return err
