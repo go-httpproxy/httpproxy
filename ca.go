@@ -5,7 +5,6 @@ import (
 	"crypto/sha1"
 	"crypto/tls"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"math/big"
 	mrand "math/rand"
 	"net"
@@ -187,7 +186,7 @@ func SignHosts(ca tls.Certificate, hosts []string) (*tls.Certificate, error) {
 	template := x509.Certificate{
 		SerialNumber:          serial,
 		Issuer:                x509ca.Subject,
-		Subject:               pkix.Name{},
+		Subject:               x509ca.Subject,
 		NotBefore:             start,
 		NotAfter:              end,
 		KeyUsage:              x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
