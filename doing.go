@@ -121,7 +121,7 @@ func doConnect(ctx *Context, w http.ResponseWriter, r *http.Request) (w2 http.Re
 	case ConnectProxy:
 		conn, err := net.Dial("tcp", host)
 		if err != nil {
-			hijConn.Write([]byte("HTTP/1.1 502 Bad Gateway\r\n\r\n"))
+			hijConn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 			hijConn.Close()
 			doError(ctx, "Connect", ErrRemoteConnect, err)
 			return
@@ -247,7 +247,7 @@ func doResponse(ctx *Context, w http.ResponseWriter, r *http.Request) error {
 		if err != context.Canceled && !isConnectionClosed(err) {
 			doError(ctx, "Response", ErrRoundTrip, err)
 		}
-		err := ServeInMemory(w, 502, nil, []byte("Bad Gateway"))
+		err := ServeInMemory(w, 404, nil, nil)
 		if err != nil && !isConnectionClosed(err) {
 			doError(ctx, "Response", ErrResponseWrite, err)
 		}
