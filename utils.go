@@ -18,12 +18,15 @@ func InMemoryResponse(code int, header http.Header, body []byte) *http.Response 
 	if header == nil {
 		header = make(http.Header)
 	}
-	if body == nil {
-		body = make([]byte, 0)
-	}
 	st := http.StatusText(code)
 	if st != "" {
 		st = " " + st
+	}
+	var bodyReadCloser io.ReadCloser
+	var bodyContentLength = int64(-1)
+	if body != nil {
+		bodyReadCloser = ioutil.NopCloser(bytes.NewBuffer(body))
+		bodyContentLength = int64(len(body))
 	}
 	return &http.Response{
 		Status:        fmt.Sprintf("%d%s", code, st),
@@ -32,8 +35,8 @@ func InMemoryResponse(code int, header http.Header, body []byte) *http.Response 
 		ProtoMajor:    1,
 		ProtoMinor:    1,
 		Header:        header,
-		Body:          ioutil.NopCloser(bytes.NewBuffer(body)),
-		ContentLength: int64(len(body)),
+		Body:          bodyReadCloser,
+		ContentLength: bodyContentLength,
 	}
 }
 
