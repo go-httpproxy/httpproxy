@@ -20,7 +20,10 @@ func doError(ctx *Context, when string, err *Error, opErr error) {
 }
 
 func doAccept(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
-	if ctx.Prx.OnAccept == nil || !ctx.Prx.OnAccept(ctx, w, r) {
+	if ctx.Prx.OnAccept == nil {
+		return false
+	}
+	if !ctx.Prx.OnAccept(ctx, w, r) {
 		return false
 	}
 	if r.Body != nil {
