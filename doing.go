@@ -12,6 +12,52 @@ import (
 	"sync"
 )
 
+func onAccept(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
+	defer func() {
+		if err, ok := recover().(error); ok {
+			doError(ctx, "Accept", ErrPanic, err)
+		}
+	}()
+	return ctx.Prx.OnAccept(ctx, w, r)
+}
+
+func onAuth(ctx *Context, user string, pass string) bool {
+	defer func() {
+		if err, ok := recover().(error); ok {
+			doError(ctx, "Auth", ErrPanic, err)
+		}
+	}()
+	return ctx.Prx.OnAuth(ctx, user, pass)
+}
+
+func onConnect(ctx *Context, host string) (ConnectAction ConnectAction,
+	newHost string) {
+	defer func() {
+		if err, ok := recover().(error); ok {
+			doError(ctx, "Connect", ErrPanic, err)
+		}
+	}()
+	return ctx.Prx.OnConnect(ctx, host)
+}
+
+func onRequest(ctx *Context, req *http.Request) (resp *http.Response) {
+	defer func() {
+		if err, ok := recover().(error); ok {
+			doError(ctx, "Request", ErrPanic, err)
+		}
+	}()
+	return ctx.Prx.OnRequest(ctx, req)
+}
+
+func onResponse(ctx *Context, req *http.Request, resp *http.Response) {
+	defer func() {
+		if err, ok := recover().(error); ok {
+			doError(ctx, "Response", ErrPanic, err)
+		}
+	}()
+	ctx.Prx.OnResponse(ctx, req, resp)
+}
+
 func doError(ctx *Context, when string, err *Error, opErr error) {
 	if ctx.Prx.OnError == nil {
 		return
@@ -23,7 +69,7 @@ func doAccept(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
 	if ctx.Prx.OnAccept == nil {
 		return false
 	}
-	if !ctx.Prx.OnAccept(ctx, w, r) {
+	if !onAccept(ctx, w, r) {
 		return false
 	}
 	if r.Body != nil {
@@ -55,7 +101,7 @@ func doAuth(ctx *Context, w http.ResponseWriter, r *http.Request) bool {
 				userpassraw, err := base64.StdEncoding.DecodeString(authData)
 				if err == nil {
 					userpass := strings.SplitN(string(userpassraw), ":", 2)
-					if len(userpass) >= 2 && ctx.Prx.OnAuth(ctx, userpass[0], userpass[1]) {
+					if len(userpass) >= 2 && onAuth(ctx, userpass[0], userpass[1]) {
 						return false
 					}
 				}
@@ -108,7 +154,7 @@ func doConnect(ctx *Context, w http.ResponseWriter, r *http.Request) (w2 http.Re
 	host := r.URL.Host
 	if ctx.Prx.OnConnect != nil {
 		var newHost string
-		ctx.ConnectAction, newHost = ctx.Prx.OnConnect(ctx, host)
+		ctx.ConnectAction, newHost = onConnect(ctx, host)
 		if newHost != "" {
 			host = newHost
 		}
@@ -220,7 +266,7 @@ func doRequest(ctx *Context, w http.ResponseWriter, r *http.Request) (bool, erro
 	if ctx.Prx.OnRequest == nil {
 		return false, nil
 	}
-	resp := ctx.Prx.OnRequest(ctx, r)
+	resp := onRequest(ctx, r)
 	if resp == nil {
 		return false, nil
 	}
@@ -254,7 +300,7 @@ func doResponse(ctx *Context, w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	if ctx.Prx.OnResponse != nil {
-		ctx.Prx.OnResponse(ctx, r, resp)
+		onResponse(ctx, r, resp)
 	}
 	resp.TransferEncoding = nil
 	if ctx.ConnectAction == ConnectMitm && ctx.Prx.MitmChunked {
