@@ -97,16 +97,20 @@ func (ctx *Context) doError(when string, err *Error, opErr error) {
 }
 
 func (ctx *Context) doAccept(w http.ResponseWriter, r *http.Request) bool {
-	if ctx.Prx.OnAccept == nil {
-		return false
+	if !r.ProtoAtLeast(1, 0) || r.ProtoMajor*10+r.ProtoMinor > 11 {
+		if r.Body != nil {
+			defer r.Body.Close()
+		}
+		ctx.doError("Accept", ErrNotSupportHTTPVer, nil)
+		return true
 	}
-	if !ctx.onAccept(w, r) {
-		return false
+	if ctx.Prx.OnAccept != nil && ctx.onAccept(w, r) {
+		if r.Body != nil {
+			defer r.Body.Close()
+		}
+		return true
 	}
-	if r.Body != nil {
-		defer r.Body.Close()
-	}
-	return true
+	return false
 }
 
 func (ctx *Context) doAuth(w http.ResponseWriter, r *http.Request) bool {

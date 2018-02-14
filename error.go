@@ -13,12 +13,13 @@ var (
 	ErrResponseWrite               = NewError("response write")
 	ErrRequestRead                 = NewError("request read")
 	ErrRemoteConnect               = NewError("remote connect")
-	ErrNotSupportHijacking         = NewError("httpserver does not support hijacking")
+	ErrNotSupportHijacking         = NewError("hijacking not supported")
 	ErrTLSSignHost                 = NewError("TLS sign host")
 	ErrTLSHandshake                = NewError("TLS handshake")
 	ErrAbsURLAfterCONNECT          = NewError("absolute URL after CONNECT")
 	ErrRoundTrip                   = NewError("round trip")
 	ErrUnsupportedTransferEncoding = NewError("unsupported transfer encoding")
+	ErrNotSupportHTTPVer           = NewError("http version not supported")
 )
 
 // Error struct is base of library specific errors.
