@@ -236,11 +236,11 @@ func doRequest(ctx *Context, w http.ResponseWriter, r *http.Request) (bool, erro
 }
 
 func doResponse(ctx *Context, w http.ResponseWriter, r *http.Request) error {
+	if r.Body != nil {
+		defer r.Body.Close()
+	}
 	resp, err := ctx.Prx.Rt.RoundTrip(r)
 	if err != nil {
-		if r.Body != nil {
-			defer r.Body.Close()
-		}
 		if err != context.Canceled && !isConnectionClosed(err) {
 			doError(ctx, "Response", ErrRoundTrip, err)
 		}
