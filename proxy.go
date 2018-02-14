@@ -101,16 +101,16 @@ func (prx *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	if doAccept(ctx, w, r) {
+	if ctx.doAccept(w, r) {
 		return
 	}
 
-	if doAuth(ctx, w, r) {
+	if ctx.doAuth(w, r) {
 		return
 	}
 	removeProxyHeaders(r)
 
-	if w2 := doConnect(ctx, w, r); w2 != nil {
+	if w2 := ctx.doConnect(w, r); w2 != nil {
 		if w != w2 {
 			w = w2
 			r = nil
@@ -126,13 +126,13 @@ func (prx *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if prx.MitmChunked {
 				cyclic = true
 			}
-			r = doMitm(ctx, w)
+			r = ctx.doMitm(w)
 		}
 		if r == nil {
 			break
 		}
 		ctx.SubSessionNo++
-		if b, err := doRequest(ctx, w, r); err != nil {
+		if b, err := ctx.doRequest(w, r); err != nil {
 			break
 		} else {
 			if b {
@@ -143,7 +143,7 @@ func (prx *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		if err := doResponse(ctx, w, r); err != nil || !cyclic {
+		if err := ctx.doResponse(w, r); err != nil || !cyclic {
 			break
 		}
 	}
