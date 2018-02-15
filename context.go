@@ -220,11 +220,12 @@ func (ctx *Context) doConnect(w http.ResponseWriter, r *http.Request) (w2 http.R
 		wg.Add(2)
 		go func() {
 			_, err := io.Copy(remoteConn, hijConn)
-			remoteConn.CloseWrite()
-			if c, ok := hijConn.(*net.TCPConn); ok {
-				c.CloseRead()
-			}
-			if err != nil {
+			if err == nil {
+				remoteConn.CloseWrite()
+				if c, ok := hijConn.(*net.TCPConn); ok {
+					c.CloseRead()
+				}
+			} else {
 				hijConn.Close()
 				remoteConn.Close()
 				if !isConnectionClosed(err) {
@@ -235,11 +236,12 @@ func (ctx *Context) doConnect(w http.ResponseWriter, r *http.Request) (w2 http.R
 		}()
 		go func() {
 			_, err := io.Copy(hijConn, remoteConn)
-			remoteConn.CloseRead()
-			if c, ok := hijConn.(*net.TCPConn); ok {
-				c.CloseWrite()
-			}
-			if err != nil {
+			if err == nil {
+				remoteConn.CloseRead()
+				if c, ok := hijConn.(*net.TCPConn); ok {
+					c.CloseWrite()
+				}
+			} else {
 				hijConn.Close()
 				remoteConn.Close()
 				if !isConnectionClosed(err) {
