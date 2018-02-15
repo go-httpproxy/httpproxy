@@ -95,7 +95,7 @@ func (prx *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		rec := recover()
 		if rec != nil {
 			if err, ok := rec.(error); ok && prx.OnError != nil {
-				prx.OnError(ctx, "Serve", ErrPanic, err)
+				prx.OnError(ctx, "ServeHTTP", ErrPanic, err)
 			}
 			panic(rec)
 		}

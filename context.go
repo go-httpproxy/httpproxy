@@ -97,7 +97,7 @@ func (ctx *Context) doError(when string, err *Error, opErr error) {
 }
 
 func (ctx *Context) doAccept(w http.ResponseWriter, r *http.Request) bool {
-	if !r.ProtoAtLeast(1, 0) || r.ProtoMajor*10+r.ProtoMinor > 11 {
+	if !r.ProtoAtLeast(1, 0) || r.ProtoAtLeast(2, 0) {
 		if r.Body != nil {
 			defer r.Body.Close()
 		}
