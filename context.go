@@ -24,13 +24,17 @@ type Context struct {
 	// Sub session number of processing remote connection.
 	SubSessionNo int64
 
+	// Original Proxy request.
+	// It's using internally. Don't change in Context struct!
+	Req *http.Request
+
+	// Original Proxy request, if proxy request method is CONNECT.
+	// It's using internally. Don't change in Context struct!
+	ConnectReq *http.Request
+
 	// Action of after the CONNECT, if proxy request method is CONNECT.
 	// It's using internally. Don't change in Context struct!
 	ConnectAction ConnectAction
-
-	// Proxy request, if proxy request method is CONNECT.
-	// It's using internally. Don't change in Context struct!
-	ConnectReq *http.Request
 
 	// Remote host, if proxy request method is CONNECT.
 	// It's using internally. Don't change in Context struct!
@@ -97,6 +101,7 @@ func (ctx *Context) doError(where string, err *Error, opErr error) {
 }
 
 func (ctx *Context) doAccept(w http.ResponseWriter, r *http.Request) bool {
+	ctx.Req = r
 	if !r.ProtoAtLeast(1, 0) || r.ProtoAtLeast(2, 0) {
 		if r.Body != nil {
 			defer r.Body.Close()
@@ -183,8 +188,8 @@ func (ctx *Context) doConnect(w http.ResponseWriter, r *http.Request) (w2 http.R
 		return
 	}
 	hijConn := conn
-	ctx.ConnectAction = ConnectProxy
 	ctx.ConnectReq = r
+	ctx.ConnectAction = ConnectProxy
 	host := r.URL.Host
 	if ctx.Prx.OnConnect != nil {
 		var newHost string
