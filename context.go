@@ -319,7 +319,7 @@ func (ctx *Context) doRequest(w http.ResponseWriter, r *http.Request) (bool, err
 		}
 		return true, err
 	}
-	r.RequestURI = r.URL.RequestURI()
+	r.RequestURI = r.URL.String()
 	if ctx.Prx.OnRequest == nil {
 		return false, nil
 	}
