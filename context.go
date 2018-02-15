@@ -182,7 +182,6 @@ func (ctx *Context) doConnect(w http.ResponseWriter, r *http.Request) (w2 http.R
 		ctx.doError("Connect", ErrNotSupportHijacking, err)
 		return
 	}
-	//hijConn := conn.(*net.TCPConn)
 	hijConn := conn
 	ctx.ConnectAction = ConnectProxy
 	ctx.ConnectReq = r
@@ -305,7 +304,6 @@ func (ctx *Context) doMitm(w http.ResponseWriter) (r *http.Request) {
 }
 
 func (ctx *Context) doRequest(w http.ResponseWriter, r *http.Request) (bool, error) {
-	r.RequestURI = ""
 	if !r.URL.IsAbs() {
 		if r.Body != nil {
 			defer r.Body.Close()
@@ -316,6 +314,7 @@ func (ctx *Context) doRequest(w http.ResponseWriter, r *http.Request) (bool, err
 		}
 		return true, err
 	}
+	r.RequestURI = r.URL.RequestURI()
 	if ctx.Prx.OnRequest == nil {
 		return false, nil
 	}
