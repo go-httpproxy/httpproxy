@@ -52,13 +52,13 @@ func (ctx *Context) onAccept(w http.ResponseWriter, r *http.Request) bool {
 	return ctx.Prx.OnAccept(ctx, w, r)
 }
 
-func (ctx *Context) onAuth(user string, pass string) bool {
+func (ctx *Context) onAuth(authType string, user string, pass string) bool {
 	defer func() {
 		if err, ok := recover().(error); ok {
 			ctx.doError("Auth", ErrPanic, err)
 		}
 	}()
-	return ctx.Prx.OnAuth(ctx, user, pass)
+	return ctx.Prx.OnAuth(ctx, authType, user, pass)
 }
 
 func (ctx *Context) onConnect(host string) (ConnectAction ConnectAction,
@@ -89,11 +89,11 @@ func (ctx *Context) onResponse(req *http.Request, resp *http.Response) {
 	ctx.Prx.OnResponse(ctx, req, resp)
 }
 
-func (ctx *Context) doError(when string, err *Error, opErr error) {
+func (ctx *Context) doError(where string, err *Error, opErr error) {
 	if ctx.Prx.OnError == nil {
 		return
 	}
-	ctx.Prx.OnError(ctx, when, err, opErr)
+	ctx.Prx.OnError(ctx, where, err, opErr)
 }
 
 func (ctx *Context) doAccept(w http.ResponseWriter, r *http.Request) bool {
@@ -136,7 +136,7 @@ func (ctx *Context) doAuth(w http.ResponseWriter, r *http.Request) bool {
 				userpassraw, err := base64.StdEncoding.DecodeString(authData)
 				if err == nil {
 					userpass := strings.SplitN(string(userpassraw), ":", 2)
-					if len(userpass) >= 2 && ctx.onAuth(userpass[0], userpass[1]) {
+					if len(userpass) >= 2 && ctx.onAuth(authType, userpass[0], userpass[1]) {
 						return false
 					}
 				}

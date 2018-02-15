@@ -24,7 +24,7 @@ type Proxy struct {
 	UserData interface{}
 
 	// Error handler.
-	OnError func(ctx *Context, when string, err *Error, opErr error)
+	OnError func(ctx *Context, where string, err *Error, opErr error)
 
 	// Accept handler. It greets proxy request like ServeHTTP function of
 	// http.Handler.
@@ -33,7 +33,7 @@ type Proxy struct {
 
 	// Auth handler. If you need authentication, set this handler.
 	// If it returns true, authentication succeeded.
-	OnAuth func(ctx *Context, user string, pass string) bool
+	OnAuth func(ctx *Context, authType string, user string, pass string) bool
 
 	// Connect handler. It sets connect action and new host.
 	// If len(newhost) > 0, host changes.
