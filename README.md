@@ -34,7 +34,7 @@ type Proxy struct {
 	UserData interface{}
 
 	// Error handler.
-	OnError func(ctx *Context, when string, err *Error, opErr error)
+	OnError func(ctx *Context, where string, err *Error, opErr error)
 
 	// Accept handler. It greets proxy request like ServeHTTP function of
 	// http.Handler.
@@ -43,7 +43,7 @@ type Proxy struct {
 
 	// Auth handler. If you need authentication, set this handler.
 	// If it returns true, authentication succeeded.
-	OnAuth func(ctx *Context, user string, pass string) bool
+	OnAuth func(ctx *Context, authType string, user string, pass string) bool
 
 	// Connect handler. It sets connect action and new host.
 	// If len(newhost) > 0, host changes.
@@ -83,13 +83,17 @@ type Context struct {
 	// Sub session number of processing remote connection.
 	SubSessionNo int64
 
+	// Original Proxy request.
+	// It's using internally. Don't change in Context struct!
+	Req *http.Request
+
+	// Original Proxy request, if proxy request method is CONNECT.
+	// It's using internally. Don't change in Context struct!
+	ConnectReq *http.Request
+
 	// Action of after the CONNECT, if proxy request method is CONNECT.
 	// It's using internally. Don't change in Context struct!
 	ConnectAction ConnectAction
-
-	// Proxy request, if proxy request method is CONNECT.
-	// It's using internally. Don't change in Context struct!
-	ConnectReq *http.Request
 
 	// Remote host, if proxy request method is CONNECT.
 	// It's using internally. Don't change in Context struct!
@@ -100,7 +104,7 @@ type Context struct {
 }
 ```
 
-### Demo code
+### Simple code
 
 ```go
 package main
@@ -112,10 +116,10 @@ import (
 	"github.com/go-httpproxy/httpproxy"
 )
 
-func OnError(ctx *httpproxy.Context, when string,
+func OnError(ctx *httpproxy.Context, where string,
 	err *httpproxy.Error, opErr error) {
 	// Log errors.
-	log.Printf("ERR: %s: %s [%s]", when, err, opErr)
+	log.Printf("ERR: %s: %s [%s]", where, err, opErr)
 }
 
 func OnAccept(ctx *httpproxy.Context, w http.ResponseWriter,
@@ -128,7 +132,7 @@ func OnAccept(ctx *httpproxy.Context, w http.ResponseWriter,
 	return false
 }
 
-func OnAuth(ctx *httpproxy.Context, user string, pass string) bool {
+func OnAuth(ctx *httpproxy.Context, authType string, user string, pass string) bool {
 	// Auth test user.
 	if user == "test" && pass == "1234" {
 		return true

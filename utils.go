@@ -18,12 +18,15 @@ func InMemoryResponse(code int, header http.Header, body []byte) *http.Response 
 	if header == nil {
 		header = make(http.Header)
 	}
-	if body == nil {
-		body = make([]byte, 0)
-	}
 	st := http.StatusText(code)
 	if st != "" {
 		st = " " + st
+	}
+	var bodyReadCloser io.ReadCloser
+	var bodyContentLength = int64(-1)
+	if body != nil {
+		bodyReadCloser = ioutil.NopCloser(bytes.NewBuffer(body))
+		bodyContentLength = int64(len(body))
 	}
 	return &http.Response{
 		Status:        fmt.Sprintf("%d%s", code, st),
@@ -32,14 +35,14 @@ func InMemoryResponse(code int, header http.Header, body []byte) *http.Response 
 		ProtoMajor:    1,
 		ProtoMinor:    1,
 		Header:        header,
-		Body:          ioutil.NopCloser(bytes.NewBuffer(body)),
-		ContentLength: int64(len(body)),
+		Body:          bodyReadCloser,
+		ContentLength: bodyContentLength,
 	}
 }
 
 // ServeResponse serves HTTP response to http.ResponseWriter.
 func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
-	if resp.Close {
+	if resp.Body != nil {
 		defer resp.Body.Close()
 	}
 	h := w.Header()
@@ -71,8 +74,10 @@ func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
 	switch te {
 	case "":
 		w.WriteHeader(resp.StatusCode)
-		if _, err := io.Copy(w, resp.Body); err != nil {
-			return err
+		if resp.Body != nil {
+			if _, err := io.Copy(w, resp.Body); err != nil {
+				return err
+			}
 		}
 	case "chunked":
 		h.Add("Transfer-Encoding", "chunked")
@@ -80,8 +85,10 @@ func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
 		h.Set("Connection", "close")
 		w.WriteHeader(resp.StatusCode)
 		w2 := httputil.NewChunkedWriter(w)
-		if _, err := io.Copy(w2, resp.Body); err != nil {
-			return err
+		if resp.Body != nil {
+			if _, err := io.Copy(w2, resp.Body); err != nil {
+				return err
+			}
 		}
 		if err := w2.Close(); err != nil {
 			return err
