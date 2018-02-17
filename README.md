@@ -1,4 +1,4 @@
-# Go HTTP proxy library
+# Go HTTP proxy server library
 
 [![GoDoc](https://godoc.org/github.com/go-httpproxy/httpproxy?status.svg)](https://godoc.org/github.com/go-httpproxy/httpproxy)
 
