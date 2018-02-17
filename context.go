@@ -191,6 +191,9 @@ func (ctx *Context) doConnect(w http.ResponseWriter, r *http.Request) (w2 http.R
 	ctx.ConnectReq = r
 	ctx.ConnectAction = ConnectProxy
 	host := r.URL.Host
+	if !hasPort.MatchString(host) {
+		host += ":80"
+	}
 	if ctx.Prx.OnConnect != nil {
 		var newHost string
 		ctx.ConnectAction, newHost = ctx.onConnect(host)
@@ -259,7 +262,7 @@ func (ctx *Context) doConnect(w http.ResponseWriter, r *http.Request) (w2 http.R
 		remoteConn.Close()
 	case ConnectMitm:
 		tlsConfig := &tls.Config{}
-		cert := ctx.Prx.signer.SignHost(stripPort(host))
+		cert := ctx.Prx.signer.SignHost(host)
 		if cert == nil {
 			hijConn.Close()
 			ctx.doError("Connect", ErrTLSSignHost, err)
