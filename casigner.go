@@ -107,6 +107,7 @@ func SignHosts(ca tls.Certificate, hosts []string) (*tls.Certificate, error) {
 		BasicConstraintsValid: true,
 	}
 	for _, h := range hosts {
+		h = stripPort(h)
 		if ip := net.ParseIP(h); ip != nil {
 			template.IPAddresses = append(template.IPAddresses, ip)
 		} else {
