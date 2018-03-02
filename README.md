@@ -9,6 +9,14 @@ attack.
 It's easy to use. `httpproxy.Proxy` implements `Handler` interface of `net/http`
 package to offer `http.ListenAndServe` function.
 
+## Installing
+
+```sh
+go get -u github.com/go-httpproxy/httpproxy
+# or
+go get -u gopkg.in/httpproxy.v1
+```
+
 ## Usage
 
 Library has two significant structs: Proxy and Context.
@@ -104,7 +112,11 @@ type Context struct {
 }
 ```
 
-### Simple code
+## Examples
+
+For more examples, examples/
+
+### examples/go-httpproxy-simple
 
 ```go
 package main
