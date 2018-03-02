@@ -33,29 +33,29 @@ type Proxy struct {
 	// User data to use free.
 	UserData interface{}
 
-	// Error handler.
+	// Error callback.
 	OnError func(ctx *Context, where string, err *Error, opErr error)
 
-	// Accept handler. It greets proxy request like ServeHTTP function of
+	// Accept callback. It greets proxy request like ServeHTTP function of
 	// http.Handler.
 	// If it returns true, stops processing proxy request.
 	OnAccept func(ctx *Context, w http.ResponseWriter, r *http.Request) bool
 
-	// Auth handler. If you need authentication, set this handler.
+	// Auth callback. If you need authentication, set this callback.
 	// If it returns true, authentication succeeded.
 	OnAuth func(ctx *Context, authType string, user string, pass string) bool
 
-	// Connect handler. It sets connect action and new host.
+	// Connect callback. It sets connect action and new host.
 	// If len(newhost) > 0, host changes.
 	OnConnect func(ctx *Context, host string) (ConnectAction ConnectAction,
 		newHost string)
 
-	// Request handler. It greets remote request.
+	// Request callback. It greets remote request.
 	// If it returns non-nil response, stops processing remote request.
 	OnRequest func(ctx *Context, req *http.Request) (resp *http.Response)
 
-	// Response handler. It greets remote response.
-	// Remote response sends after this handler.
+	// Response callback. It greets remote response.
+	// Remote response sends after this callback.
 	OnResponse func(ctx *Context, req *http.Request, resp *http.Response)
 
 	// If ConnectAction is ConnectMitm, it sets chunked to Transfer-Encoding.
