@@ -1,3 +1,19 @@
+/*
+go-httpproxy-demo is an example for HTTP and HTTPS web proxy.
+
+Connect through HTTP proxy to HTTP:
+curl -x "http://test:1234@localhost:8080" http://httpbin.org/get?a=b
+
+Connect through HTTP proxy to HTTPS with MITM:
+curl --insecure -x "http://test:1234@localhost:8080" https://httpbin.org/get?a=b
+
+Connect through HTTPS proxy to HTTP:
+curl --proxy-insecure -x "https://test:1234@localhost:8443" http://httpbin.org/get?a=b
+
+Connect through HTTPS proxy to HTTPS with MITM:
+curl --proxy-insecure --insecure -x "https://test:1234@localhost:8443" https://httpbin.org/get?a=b
+
+*/
 package main
 
 import (
@@ -7,6 +23,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -60,7 +77,7 @@ func OnResponse(ctx *httpproxy.Context, req *http.Request,
 
 func main() {
 	log.SetOutput(os.Stdout)
-	log.Print("started")
+	log.Print("Started")
 
 	sigChan := make(chan os.Signal)
 	signal.Notify(sigChan, os.Interrupt, os.Kill, syscall.SIGTERM)
@@ -87,6 +104,30 @@ func main() {
 	}()
 	log.Printf("Listening HTTP %s", server.Addr)
 
+	cert, _ := tls.X509KeyPair(httpproxy.DefaultCaCert, httpproxy.DefaultCaKey)
+	serverHTTPS := &http.Server{
+		Addr:         ":8443",
+		Handler:      prx,
+		TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
+		TLSConfig: &tls.Config{
+			MinVersion:               tls.VersionSSL30,
+			CurvePreferences:         []tls.CurveID{tls.CurveP521, tls.CurveP384, tls.CurveP256},
+			PreferServerCipherSuites: true,
+			CipherSuites: []uint16{
+				tls.TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_ECDHE_RSA_WITH_AES_256_CBC_SHA,
+				tls.TLS_RSA_WITH_AES_256_GCM_SHA384,
+				tls.TLS_RSA_WITH_AES_256_CBC_SHA,
+			},
+			Certificates: []tls.Certificate{cert},
+		},
+	}
+	listenHTTPSErrChan := make(chan error)
+	go func() {
+		listenHTTPSErrChan <- serverHTTPS.ListenAndServeTLS("", "")
+	}()
+	log.Printf("Listening HTTPS %s", serverHTTPS.Addr)
+
 mainloop:
 	for {
 		select {
@@ -100,12 +141,24 @@ mainloop:
 		}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	server.SetKeepAlivesEnabled(false)
-	if err := server.Shutdown(ctx); err == context.DeadlineExceeded {
-		log.Print("force shutdown")
-	} else {
-		log.Print("graceful shutdown")
+	shutdown := func(srv *http.Server, wg *sync.WaitGroup) {
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+		defer cancel()
+		srv.SetKeepAlivesEnabled(false)
+		if err := srv.Shutdown(ctx); err == context.DeadlineExceeded {
+			log.Printf("Force shutdown %s", srv.Addr)
+		} else {
+			log.Printf("Graceful shutdown %s", srv.Addr)
+		}
+		wg.Done()
 	}
+
+	wg := &sync.WaitGroup{}
+	wg.Add(1)
+	go shutdown(server, wg)
+	wg.Add(1)
+	go shutdown(serverHTTPS, wg)
+	wg.Wait()
+
+	log.Println("Finished")
 }
