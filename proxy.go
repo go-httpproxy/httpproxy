@@ -108,7 +108,9 @@ func (prx *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if ctx.doAuth(w, r) {
 		return
 	}
-	removeProxyHeaders(r)
+	r.Header.Del("Proxy-Connection")
+	r.Header.Del("Proxy-Authenticate")
+	r.Header.Del("Proxy-Authorization")
 
 	if w2 := ctx.doConnect(w, r); w2 != nil {
 		if w != w2 {
@@ -131,6 +133,8 @@ func (prx *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		if r == nil {
 			break
 		}
+		r.Header.Del("Accept-Encoding")
+		r.Header.Del("Connection")
 		ctx.SubSessionNo++
 		if b, err := ctx.doRequest(w, r); err != nil {
 			break
