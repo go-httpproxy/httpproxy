@@ -226,36 +226,50 @@ func (ctx *Context) doConnect(w http.ResponseWriter, r *http.Request) (w2 http.R
 		var wg sync.WaitGroup
 		wg.Add(2)
 		go func() {
-			_, err := io.Copy(remoteConn, hijConn)
-			if err == nil {
-				remoteConn.CloseWrite()
-				if c, ok := hijConn.(*net.TCPConn); ok {
-					c.CloseRead()
+			defer wg.Done()
+			defer func() {
+				e := recover()
+				err, ok := e.(error)
+				if !ok {
+					return
 				}
-			} else {
 				hijConn.Close()
 				remoteConn.Close()
 				if !isConnectionClosed(err) {
 					ctx.doError("Connect", ErrRequestRead, err)
 				}
+			}()
+			_, err := io.Copy(remoteConn, hijConn)
+			if err != nil {
+				panic(err)
 			}
-			wg.Done()
+			remoteConn.CloseWrite()
+			if c, ok := hijConn.(*net.TCPConn); ok {
+				c.CloseRead()
+			}
 		}()
 		go func() {
-			_, err := io.Copy(hijConn, remoteConn)
-			if err == nil {
-				remoteConn.CloseRead()
-				if c, ok := hijConn.(*net.TCPConn); ok {
-					c.CloseWrite()
+			defer wg.Done()
+			defer func() {
+				e := recover()
+				err, ok := e.(error)
+				if !ok {
+					return
 				}
-			} else {
 				hijConn.Close()
 				remoteConn.Close()
 				if !isConnectionClosed(err) {
 					ctx.doError("Connect", ErrResponseWrite, err)
 				}
+			}()
+			_, err := io.Copy(hijConn, remoteConn)
+			if err != nil {
+				panic(err)
 			}
-			wg.Done()
+			remoteConn.CloseRead()
+			if c, ok := hijConn.(*net.TCPConn); ok {
+				c.CloseWrite()
+			}
 		}()
 		wg.Wait()
 		hijConn.Close()
