@@ -138,6 +138,11 @@ mainloop:
 				break mainloop
 			}
 			log.Fatal(listenErr)
+		case listenErr := <-listenHTTPSErrChan:
+			if listenErr != nil && listenErr == http.ErrServerClosed {
+				break mainloop
+			}
+			log.Fatal(listenErr)
 		}
 	}
 
