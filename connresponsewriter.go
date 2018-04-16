@@ -32,7 +32,7 @@ func (c *ConnResponseWriter) Header() http.Header {
 func (c *ConnResponseWriter) Write(body []byte) (int, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.WriteHeader(http.StatusOK)
+	c.writeHeader(http.StatusOK)
 	if c.err != nil {
 		return 0, c.err
 	}
@@ -47,6 +47,15 @@ func (c *ConnResponseWriter) Write(body []byte) (int, error) {
 func (c *ConnResponseWriter) WriteHeader(statusCode int) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
+	c.writeHeader(statusCode)
+}
+
+// Close closes network connection.
+func (c *ConnResponseWriter) Close() error {
+	return c.Conn.Close()
+}
+
+func (c *ConnResponseWriter) writeHeader(statusCode int) {
 	if c.err != nil {
 		return
 	}
@@ -70,9 +79,4 @@ func (c *ConnResponseWriter) WriteHeader(statusCode int) {
 		return
 	}
 	c.headersSent = true
-}
-
-// Close closes network connection.
-func (c *ConnResponseWriter) Close() error {
-	return c.Conn.Close()
 }
