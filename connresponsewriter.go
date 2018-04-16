@@ -13,7 +13,7 @@ import (
 type ConnResponseWriter struct {
 	Conn        net.Conn
 	mu          sync.Mutex
-	code        int
+	err         error
 	header      http.Header
 	headersSent bool
 }
@@ -32,28 +32,44 @@ func (c *ConnResponseWriter) Header() http.Header {
 func (c *ConnResponseWriter) Write(body []byte) (int, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if !c.headersSent {
-		c.headersSent = true
-		st := http.StatusText(c.code)
-		if st != "" {
-			st = " " + st
-		}
-		if _, err := io.WriteString(c.Conn, fmt.Sprintf("HTTP/1.1 %d%s\r\n", c.code, st)); err != nil {
-			return 0, err
-		}
-		if err := c.header.Write(c.Conn); err != nil {
-			return 0, err
-		}
-		if _, err := io.WriteString(c.Conn, "\r\n"); err != nil {
-			return 0, err
-		}
+	c.WriteHeader(http.StatusOK)
+	if c.err != nil {
+		return 0, c.err
 	}
-	return c.Conn.Write(body)
+	n, err := c.Conn.Write(body)
+	if err != nil {
+		c.err = err
+	}
+	return n, err
 }
 
 // WriteHeader sends an HTTP response header with status code.
-func (c *ConnResponseWriter) WriteHeader(code int) {
-	c.code = code
+func (c *ConnResponseWriter) WriteHeader(statusCode int) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.err != nil {
+		return
+	}
+	if c.headersSent {
+		return
+	}
+	st := http.StatusText(statusCode)
+	if st != "" {
+		st = " " + st
+	}
+	if _, err := io.WriteString(c.Conn, fmt.Sprintf("HTTP/1.1 %d%s\r\n", statusCode, st)); err != nil {
+		c.err = err
+		return
+	}
+	if err := c.header.Write(c.Conn); err != nil {
+		c.err = err
+		return
+	}
+	if _, err := io.WriteString(c.Conn, "\r\n"); err != nil {
+		c.err = err
+		return
+	}
+	c.headersSent = true
 }
 
 // Close closes network connection.
