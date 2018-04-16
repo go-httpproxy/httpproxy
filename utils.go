@@ -52,7 +52,6 @@ func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
 		}
 	}
 	if h.Get("Date") == "" {
-		//h.Set("Date", time.Now().UTC().Format(time.RFC1123))
 		h.Set("Date", time.Now().UTC().Format("Mon, 2 Jan 2006 15:04:05")+" GMT")
 	}
 	if h.Get("Content-Type") == "" {
@@ -63,6 +62,7 @@ func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
 	} else {
 		h.Del("Content-Length")
 	}
+	h.Del("Connection")
 	h.Del("Transfer-Encoding")
 	te := ""
 	if len(resp.TransferEncoding) > 0 {
@@ -80,8 +80,7 @@ func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
 			}
 		}
 	case "chunked":
-		h.Add("Transfer-Encoding", "chunked")
-		//h.Del("Content-Length")
+		h.Set("Transfer-Encoding", "chunked")
 		h.Set("Connection", "close")
 		w.WriteHeader(resp.StatusCode)
 		w2 := httputil.NewChunkedWriter(w)
