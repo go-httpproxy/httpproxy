@@ -23,7 +23,7 @@ func InMemoryResponse(code int, header http.Header, body []byte) *http.Response 
 		st = " " + st
 	}
 	var bodyReadCloser io.ReadCloser
-	var bodyContentLength = int64(-1)
+	var bodyContentLength = int64(0)
 	if body != nil {
 		bodyReadCloser = ioutil.NopCloser(bytes.NewBuffer(body))
 		bodyContentLength = int64(len(body))
@@ -52,10 +52,9 @@ func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
 		}
 	}
 	if h.Get("Date") == "" {
-		//h.Set("Date", time.Now().UTC().Format(time.RFC1123))
 		h.Set("Date", time.Now().UTC().Format("Mon, 2 Jan 2006 15:04:05")+" GMT")
 	}
-	if h.Get("Content-Type") == "" {
+	if h.Get("Content-Type") == "" && resp.ContentLength != 0 {
 		h.Set("Content-Type", "text/plain; charset=utf-8")
 	}
 	if resp.ContentLength >= 0 {
@@ -71,6 +70,25 @@ func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
 		}
 		te = resp.TransferEncoding[0]
 	}
+	h.Del("Connection")
+	clientConnection := ""
+	if resp.Request != nil {
+		clientConnection = resp.Request.Header.Get("Connection")
+	}
+	switch clientConnection {
+	case "close":
+		h.Set("Connection", "close")
+	case "keep-alive":
+		if h.Get("Content-Length") != "" || te == "chunked" {
+			h.Set("Connection", "keep-alive")
+		} else {
+			h.Set("Connection", "close")
+		}
+	default:
+		if te == "chunked" {
+			h.Set("Connection", "close")
+		}
+	}
 	switch te {
 	case "":
 		w.WriteHeader(resp.StatusCode)
@@ -80,9 +98,7 @@ func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
 			}
 		}
 	case "chunked":
-		h.Add("Transfer-Encoding", "chunked")
-		//h.Del("Content-Length")
-		h.Set("Connection", "close")
+		h.Set("Transfer-Encoding", "chunked")
 		w.WriteHeader(resp.StatusCode)
 		w2 := httputil.NewChunkedWriter(w)
 		if resp.Body != nil {
