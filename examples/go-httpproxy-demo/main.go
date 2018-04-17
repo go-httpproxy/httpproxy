@@ -65,7 +65,7 @@ func OnConnect(ctx *httpproxy.Context, host string) (
 func OnRequest(ctx *httpproxy.Context, req *http.Request) (
 	resp *http.Response) {
 	// Log proxying requests.
-	log.Printf("INFO: Proxy: %s %s", req.Method, req.URL.String())
+	log.Printf("INFO: Proxy %d %d: %s %s", ctx.SessionNo, ctx.SubSessionNo, req.Method, req.URL.String())
 	return
 }
 
@@ -92,6 +92,7 @@ func main() {
 	prx.OnConnect = OnConnect
 	prx.OnRequest = OnRequest
 	prx.OnResponse = OnResponse
+	//prx.MitmChunked = false
 
 	server := &http.Server{
 		Addr:         ":8080",

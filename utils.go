@@ -54,7 +54,7 @@ func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
 	if h.Get("Date") == "" {
 		h.Set("Date", time.Now().UTC().Format("Mon, 2 Jan 2006 15:04:05")+" GMT")
 	}
-	if h.Get("Content-Type") == "" {
+	if h.Get("Content-Type") == "" && resp.ContentLength != 0 {
 		h.Set("Content-Type", "text/plain; charset=utf-8")
 	}
 	if resp.ContentLength >= 0 {
@@ -62,7 +62,6 @@ func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
 	} else {
 		h.Del("Content-Length")
 	}
-	h.Del("Connection")
 	h.Del("Transfer-Encoding")
 	te := ""
 	if len(resp.TransferEncoding) > 0 {
@@ -70,6 +69,25 @@ func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
 			return ErrUnsupportedTransferEncoding
 		}
 		te = resp.TransferEncoding[0]
+	}
+	h.Del("Connection")
+	clientConnection := ""
+	if resp.Request != nil {
+		clientConnection = resp.Request.Header.Get("Connection")
+	}
+	switch clientConnection {
+	case "close":
+		h.Set("Connection", "close")
+	case "keep-alive":
+		if h.Get("Content-Length") != "" || te == "chunked" {
+			h.Set("Connection", "keep-alive")
+		} else {
+			h.Set("Connection", "close")
+		}
+	default:
+		if te == "chunked" {
+			h.Set("Connection", "close")
+		}
 	}
 	switch te {
 	case "":
@@ -81,7 +99,6 @@ func ServeResponse(w http.ResponseWriter, resp *http.Response) error {
 		}
 	case "chunked":
 		h.Set("Transfer-Encoding", "chunked")
-		h.Set("Connection", "close")
 		w.WriteHeader(resp.StatusCode)
 		w2 := httputil.NewChunkedWriter(w)
 		if resp.Body != nil {
