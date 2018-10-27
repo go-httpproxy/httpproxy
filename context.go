@@ -65,6 +65,20 @@ func (ctx *Context) onAuth(authType string, user string, pass string) bool {
 	return ctx.Prx.OnAuth(ctx, authType, user, pass)
 }
 
+func (ctx *Context) onDial(network, addr string) (c net.Conn, err error) {
+	defer func() {
+		if err, ok := recover().(error); ok {
+			ctx.doError("Dial", ErrPanic, err)
+		}
+	}()
+	if ctx.Prx.OnDial != nil {
+		return ctx.Prx.OnDial(network, addr)
+	} else {
+		return net.Dial(network, addr)
+	}
+
+}
+
 func (ctx *Context) onConnect(host string) (ConnectAction ConnectAction,
 	newHost string) {
 	defer func() {
@@ -208,7 +222,8 @@ func (ctx *Context) doConnect(w http.ResponseWriter, r *http.Request) (b bool) {
 	ctx.ConnectHost = host
 	switch ctx.ConnectAction {
 	case ConnectProxy:
-		conn, err := net.Dial("tcp", host)
+
+		conn, err := ctx.onDial("tcp", host)
 		if err != nil {
 			hijConn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
 			hijConn.Close()

@@ -2,6 +2,7 @@ package httpproxy
 
 import (
 	"crypto/tls"
+	"net"
 	"net/http"
 	"sync/atomic"
 )
@@ -39,6 +40,8 @@ type Proxy struct {
 	// If len(newhost) > 0, host changes.
 	OnConnect func(ctx *Context, host string) (ConnectAction ConnectAction,
 		newHost string)
+
+	OnDial func(network string, addr string) (c net.Conn, err error)
 
 	// Request callback. It greets remote request.
 	// If it returns non-nil response, stops processing remote request.
