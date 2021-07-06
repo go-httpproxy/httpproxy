@@ -67,7 +67,7 @@ func NewProxy() (*Proxy, error) {
 // NewProxyCert returns a new Proxy given CA certificate and key.
 func NewProxyCert(caCert, caKey []byte) (*Proxy, error) {
 	prx := &Proxy{
-		Rt: &http.Transport{TLSClientConfig: &tls.Config{},
+		Rt: &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 			Proxy: http.ProxyFromEnvironment},
 		MitmChunked: true,
 		signer:      NewCaSignerCache(1024),
