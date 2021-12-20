@@ -370,7 +370,7 @@ func (ctx *Context) doResponse(w http.ResponseWriter, r *http.Request) error {
 		if err != context.Canceled && !isConnectionClosed(err) {
 			ctx.doError("Response", ErrRoundTrip, err)
 		}
-		err := ServeInMemory(w, 404, nil, nil)
+		err := ServeInMemory(w, 511, nil, nil)
 		if err != nil && !isConnectionClosed(err) {
 			ctx.doError("Response", ErrResponseWrite, err)
 		}
