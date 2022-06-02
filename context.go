@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"encoding/base64"
+	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -372,6 +373,7 @@ func (ctx *Context) doResponse(w http.ResponseWriter, r *http.Request) error {
 		}
 		err := ServeInMemory(w, 511, nil, nil)
 		if err != nil && !isConnectionClosed(err) {
+			fmt.Println(err)
 			ctx.doError("Response", ErrResponseWrite, err)
 		}
 		return err
