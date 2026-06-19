@@ -1,3 +1,27 @@
+# ⚠️ Project Relocation Notice
+
+**This repository is no longer actively maintained.**
+
+Development of `httpproxy` has moved to the following repository:
+
+👉 [github.com/orkunkaraduman/go-httpproxy](https://github.com/orkunkaraduman/go-httpproxy)
+
+All future bug fixes, improvements, new features, and releases will be made there.
+
+Please update your bookmarks, issues, pull requests, and dependency references accordingly.
+
+## New Repository
+
+[https://github.com/orkunkaraduman/go-httpproxy](https://github.com/orkunkaraduman/go-httpproxy)
+
+## Go Module
+
+If you are using this library in a new project, please migrate to the new repository:
+
+```bash
+go get github.com/orkunkaraduman/go-httpproxy
+```
+
 # Go HTTP proxy server library
 
 [![GoDoc](https://godoc.org/github.com/go-httpproxy/httpproxy?status.svg)](https://godoc.org/github.com/go-httpproxy/httpproxy)
